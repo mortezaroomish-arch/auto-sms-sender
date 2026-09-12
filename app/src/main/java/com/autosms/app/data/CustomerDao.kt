@@ -31,9 +31,13 @@ interface CustomerDao {
     @Query("SELECT COUNT(*) FROM customers WHERE lastSentAt IS NULL")
     suspend fun countNeverSent(): Int
 
-    /** افرادی که از زمانِ داده‌شده به بعد پیام گرفته‌اند (جدیدترین اول). */
-    @Query("SELECT * FROM customers WHERE lastSentAt >= :since ORDER BY lastSentAt DESC")
-    suspend fun getSentSince(since: Long): List<Customer>
+    /** تعداد کلِ افرادی که تا حالا پیام گرفته‌اند. */
+    @Query("SELECT COUNT(*) FROM customers WHERE lastSentAt IS NOT NULL")
+    suspend fun countSent(): Int
+
+    /** تعداد ارسال‌ها از یک زمان به بعد (برای «امروز» و «این ماه»). */
+    @Query("SELECT COUNT(*) FROM customers WHERE lastSentAt >= :since")
+    suspend fun countSince(since: Long): Int
 
     /** جدیدترین ارسال‌ها برای نمایشِ تاریخچه (حداکثر ۳۰۰ مورد تا صفحه سبک بماند). */
     @Query("SELECT * FROM customers WHERE lastSentAt IS NOT NULL ORDER BY lastSentAt DESC LIMIT 300")

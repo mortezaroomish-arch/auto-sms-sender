@@ -13,6 +13,7 @@ import com.autosms.app.data.AppSettings
 import com.autosms.app.data.Customer
 import com.autosms.app.data.SettingsRepository
 import com.autosms.app.sms.SmsSender
+import com.autosms.app.util.JalaliDate
 import com.autosms.app.work.Scheduler
 import com.autosms.app.work.SmsWorker
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +27,9 @@ import java.util.Calendar
 data class Stats(
     val totalCustomers: Int = 0,
     val neverSent: Int = 0,
-    val sentToday: Int = 0
+    val sentToday: Int = 0,
+    val sentThisMonth: Int = 0,
+    val totalSentEver: Int = 0
 )
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
@@ -41,6 +44,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _stats = MutableStateFlow(Stats())
     val stats: StateFlow<Stats> = _stats.asStateFlow()
+
+    /** زمانِ اجرای بعدی به‌صورتِ متنِ شمسی (یا «غیرفعال»). */
+    private val _nextRun = MutableStateFlow("غیرفعال")
+    val nextRun: StateFlow<String> = _nextRun.asStateFlow()
 
     /** تاریخچهٔ ارسال (جدیدترین اول، حداکثر ۳۰۰ مورد). */
     private val _history = MutableStateFlow<List<Customer>>(emptyList())
@@ -74,6 +81,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 Scheduler.cancel(getApplication())
                 _message.value = "تنظیمات ذخیره شد. ارسال خودکار غیرفعال است."
             }
+            refreshStats()
         }
     }
 
@@ -108,7 +116,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _message.value = "متن پیامک خالی است."
                 return@launch
             }
-            // برای تست، اگر شخصی‌سازی روشن است، {نام} با یک نمونه جایگزین می‌شود.
             val text = if (s.personalizeWithName) s.messageText.replace("{نام}", "دوست") else s.messageText
             val ok = withContext(Dispatchers.IO) { smsSender.send(phoneNumber, text) }
             _message.value = if (ok) "پیامک آزمایشی ارسال شد." else "ارسال پیامک آزمایشی ناموفق بود."
@@ -147,10 +154,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val total = withContext(Dispatchers.IO) { dao.count() }
             val never = withContext(Dispatchers.IO) { dao.countNeverSent() }
-            val today = withContext(Dispatchers.IO) { dao.getSentSince(startOfToday()).size }
+            val today = withContext(Dispatchers.IO) { dao.countSince(startOfToday()) }
+            val month = withContext(Dispatchers.IO) { dao.countSince(startOfMonth()) }
+            val ever = withContext(Dispatchers.IO) { dao.countSent() }
             val recent = withContext(Dispatchers.IO) { dao.getRecentSent() }
             _history.value = recent
-            _stats.value = Stats(total, never, today)
+            _stats.value = Stats(total, never, today, month, ever)
+            _nextRun.value = if (_settings.value.enabled) {
+                JalaliDate.format(computeNextRun(_settings.value.startHour))
+            } else {
+                "غیرفعال"
+            }
         }
     }
 
@@ -158,7 +172,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _message.value = null
     }
 
-    /** نیمه‌شبِ امروز به میلی‌ثانیه (برای شمارشِ ارسال‌های امروز). */
+    /** نیمه‌شبِ امروز به میلی‌ثانیه. */
     private fun startOfToday(): Long {
         val c = Calendar.getInstance()
         c.set(Calendar.HOUR_OF_DAY, 0)
@@ -166,5 +180,29 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         c.set(Calendar.SECOND, 0)
         c.set(Calendar.MILLISECOND, 0)
         return c.timeInMillis
+    }
+
+    /** ابتدای ماهِ میلادیِ جاری (تقریبِ ساده برای شمارشِ «این ماه»). */
+    private fun startOfMonth(): Long {
+        val c = Calendar.getInstance()
+        c.set(Calendar.DAY_OF_MONTH, 1)
+        c.set(Calendar.HOUR_OF_DAY, 0)
+        c.set(Calendar.MINUTE, 0)
+        c.set(Calendar.SECOND, 0)
+        c.set(Calendar.MILLISECOND, 0)
+        return c.timeInMillis
+    }
+
+    /** زمانِ نزدیک‌ترین ساعتِ شروعِ پیشِ‌رو. */
+    private fun computeNextRun(startHour: Int): Long {
+        val now = Calendar.getInstance()
+        val next = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, startHour)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        if (!next.after(now)) next.add(Calendar.DAY_OF_YEAR, 1)
+        return next.timeInMillis
     }
 }
