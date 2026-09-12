@@ -44,6 +44,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import android.Manifest
+import android.content.pm.PackageManager
 import com.autosms.app.util.JalaliDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,6 +71,11 @@ fun SettingsScreen(
     var testNumber by rememberSaveable { mutableStateOf("") }
     var showResetDialog by remember { mutableStateOf(false) }
     var showRunDialog by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val receiveSmsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
 
     LaunchedEffect(message) {
         message?.let {
@@ -254,6 +265,12 @@ fun SettingsScreen(
                                 checked = settings.autoOptOut,
                                 onCheckedChange = { checked ->
                                     viewModel.updateSettings { it.copy(autoOptOut = checked) }
+                                    if (checked && ContextCompat.checkSelfPermission(
+                                            context, Manifest.permission.RECEIVE_SMS
+                                        ) != PackageManager.PERMISSION_GRANTED
+                                    ) {
+                                        receiveSmsLauncher.launch(Manifest.permission.RECEIVE_SMS)
+                                    }
                                 }
                             )
                         }
