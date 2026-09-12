@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- ارسال پیامک -->
     <uses-permission android:name="android.permission.SEND_SMS" />
@@ -44,6 +45,16 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!--
+            سرویسِ پیش‌زمینه‌ی WorkManager باید نوعِ dataSync را صریحاً اعلام کند،
+            وگرنه در اندروید ۱۴ به بالا هنگام startForeground برنامه کرش می‌کند
+            (java.lang.IllegalArgumentException: foregroundServiceType ...).
+        -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
 
     </application>
 

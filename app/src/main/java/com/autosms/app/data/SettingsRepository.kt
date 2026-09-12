@@ -19,7 +19,13 @@ data class AppSettings(
     val dailyCount: Int = 100,
     val startHour: Int = 20,
     val endHour: Int = 22,
-    val delaySeconds: Int = 70
+    val delaySeconds: Int = 70,
+    /** اگر روشن باشد، عبارت {نام} در متن با نام مخاطب جایگزین می‌شود. */
+    val personalizeWithName: Boolean = false,
+    /** فقط شماره‌هایی که با این پیش‌شماره‌ها شروع می‌شوند پیام می‌گیرند (با کاما جدا). خالی = همه. */
+    val numberPrefixes: String = "",
+    /** شماره‌هایی که هرگز نباید پیام بگیرند (هر شماره در یک خط یا با کاما). */
+    val excludedNumbers: String = ""
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -33,6 +39,9 @@ class SettingsRepository(private val context: Context) {
         val START_HOUR = intPreferencesKey("start_hour")
         val END_HOUR = intPreferencesKey("end_hour")
         val DELAY_SECONDS = intPreferencesKey("delay_seconds")
+        val PERSONALIZE = booleanPreferencesKey("personalize_with_name")
+        val PREFIXES = stringPreferencesKey("number_prefixes")
+        val EXCLUDED = stringPreferencesKey("excluded_numbers")
     }
 
     val settingsFlow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -42,7 +51,10 @@ class SettingsRepository(private val context: Context) {
             dailyCount = p[Keys.DAILY_COUNT] ?: 100,
             startHour = p[Keys.START_HOUR] ?: 20,
             endHour = p[Keys.END_HOUR] ?: 22,
-            delaySeconds = p[Keys.DELAY_SECONDS] ?: 70
+            delaySeconds = p[Keys.DELAY_SECONDS] ?: 70,
+            personalizeWithName = p[Keys.PERSONALIZE] ?: false,
+            numberPrefixes = p[Keys.PREFIXES] ?: "",
+            excludedNumbers = p[Keys.EXCLUDED] ?: ""
         )
     }
 
@@ -56,6 +68,9 @@ class SettingsRepository(private val context: Context) {
             p[Keys.START_HOUR] = settings.startHour
             p[Keys.END_HOUR] = settings.endHour
             p[Keys.DELAY_SECONDS] = settings.delaySeconds
+            p[Keys.PERSONALIZE] = settings.personalizeWithName
+            p[Keys.PREFIXES] = settings.numberPrefixes
+            p[Keys.EXCLUDED] = settings.excludedNumbers
         }
     }
 }
