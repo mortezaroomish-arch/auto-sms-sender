@@ -11,18 +11,21 @@ import java.util.concurrent.TimeUnit
  * زمان‌بندی اجرای روزانه.
  *
  * از یک کار «یک‌بارِ خود-زمان‌بند» استفاده می‌شود: هر بار که کار اجرا می‌شود،
- * در پایانِ کار دوباره خودش را برای فردا در ساعتِ شروع زمان‌بندی می‌کند. این روش
- * نسبت به کار دوره‌ای WorkManager دقت زمانی بهتری دارد.
+ * در پایانِ کار دوباره خودش را برای فردا در ساعتِ شروع زمان‌بندی می‌کند.
  */
 object Scheduler {
 
     const val UNIQUE_WORK_NAME = "daily_sms_work"
+
+    /** برچسبِ مشترکِ همهٔ کارهای ارسال، برای اینکه دکمهٔ «توقف» بتواند همه را لغو کند. */
+    const val TAG_SMS = "sms_send_work"
 
     /** کار بعدی را برای نزدیک‌ترین ساعتِ شروعِ پیشِ‌رو زمان‌بندی می‌کند. */
     fun scheduleNext(context: Context, startHour: Int) {
         val delayMillis = millisUntilNext(startHour)
         val request = OneTimeWorkRequestBuilder<SmsWorker>()
             .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
+            .addTag(TAG_SMS)
             .build()
 
         WorkManager.getInstance(context).enqueueUniqueWork(

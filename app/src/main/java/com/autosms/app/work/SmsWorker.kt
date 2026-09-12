@@ -10,7 +10,9 @@ import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import com.autosms.app.R
 import com.autosms.app.contacts.ContactRepository
+import com.autosms.app.data.AppSettings
 import com.autosms.app.data.AppDatabase
+import com.autosms.app.data.Customer
 import com.autosms.app.data.SettingsRepository
 import com.autosms.app.sms.SmsSender
 import kotlinx.coroutines.delay
@@ -35,11 +37,7 @@ class SmsWorker(
         const val KEY_MANUAL = "manual"
     }
 
-    /**
-     * برای کارهای «فوری» (expedited) مثل دکمهٔ «اجرای دستی» لازم است؛ در گوشی‌های
-     * اندروید ۱۱ و پایین‌تر WorkManager این تابع را صدا می‌زند تا سرویس پیش‌زمینه
-     * را بسازد. نبودِ آن باعث شکستِ کار می‌شود.
-     */
+    /** برای کارهای «فوری» (اجرای دستی) در گوشی‌های قدیمی‌تر لازم است. */
     override suspend fun getForegroundInfo(): ForegroundInfo {
         val total = try {
             settingsRepo.current().dailyCount
@@ -53,6 +51,8 @@ class SmsWorker(
         val settings = settingsRepo.current()
         // اجرای دستی از داخل برنامه، محدودیتِ فعال‌بودن و بازهٔ زمانی را نادیده می‌گیرد.
         val manual = inputData.getBoolean(KEY_MANUAL, false)
+        var sent = 0
+        var failed = 0
 
         try {
             if (!manual && !settings.enabled) {
@@ -70,17 +70,29 @@ class SmsWorker(
                 dao.insertNew(allContacts)
             }
 
-            // ۲) انتخاب افرادِ نوبتی
-            val due = dao.getDueCustomers(settings.dailyCount)
+            // ۲) انتخاب افرادِ نوبتی با اعمالِ فیلترِ پیش‌شماره و لیستِ استثنا
+            val prefixes = parsePrefixes(settings.numberPrefixes)
+            val excluded = parseExcluded(settings.excludedNumbers)
+            val due = dao.getAllDue()
+                .asSequence()
+                .filter { matchesPrefix(it.phoneNumber, prefixes) }
+                .filter { toLocal(it.phoneNumber) !in excluded }
+                .take(settings.dailyCount)
+                .toList()
+
             val delayMillis = settings.delaySeconds.coerceAtLeast(1) * 1000L
 
             for ((index, customer) in due.withIndex()) {
                 // در اجرای زمان‌بندی‌شده، اگر از ساعتِ پایان گذشتیم بقیه به فردا موکول می‌شوند.
                 if (!manual && isPastEndHour(settings.endHour)) break
 
-                val ok = smsSender.send(customer.phoneNumber, settings.messageText)
+                val text = buildMessage(settings, customer)
+                val ok = smsSender.send(customer.phoneNumber, text)
                 if (ok) {
                     dao.markSent(customer.phoneNumber, System.currentTimeMillis())
+                    sent++
+                } else {
+                    failed++
                 }
                 setForegroundSafe(index + 1, due.size)
 
@@ -90,13 +102,73 @@ class SmsWorker(
                 }
             }
 
+            // اعلانِ پایانِ ارسال
+            Notifications.showCompletion(context, sent, failed)
+
             return Result.success()
         } finally {
-            // فقط برای اجرای زمان‌بندی‌شده و در حالت فعال، اجرای فردا را زمان‌بندی کن.
-            if (!manual && settings.enabled) {
+            // فقط برای اجرای زمان‌بندی‌شده، در حالتِ فعال، و اگر کاربر توقف نکرده باشد،
+            // اجرای فردا را زمان‌بندی کن.
+            if (!manual && settings.enabled && !isStopped) {
                 Scheduler.scheduleNext(context, settings.startHour)
             }
         }
+    }
+
+    /** ساختِ متنِ پیام بر اساس تنظیمات (شخصی‌سازی با نام یا متنِ یکسان). */
+    private fun buildMessage(settings: AppSettings, customer: Customer): String {
+        if (!settings.personalizeWithName) return settings.messageText
+        val name = cleanName(customer.name)
+        return settings.messageText.replace("{نام}", name)
+    }
+
+    /** حذفِ «دکتر»ِ ابتداییِ نام تا هنگام شخصی‌سازی تکراری نشود. */
+    private fun cleanName(raw: String): String {
+        var n = raw.trim()
+        if (n.startsWith("دکتر")) n = n.removePrefix("دکتر").trim()
+        if (n.startsWith("دكتر")) n = n.removePrefix("دكتر").trim()
+        return n
+    }
+
+    private fun parsePrefixes(raw: String): List<String> =
+        raw.split(',', '،', '\n', ' ', ';')
+            .map { normalizeDigits(it) }
+            .filter { it.isNotEmpty() }
+
+    private fun parseExcluded(raw: String): Set<String> =
+        raw.split(',', '،', '\n', ' ', ';')
+            .map { toLocal(it) }
+            .filter { it.isNotEmpty() }
+            .toSet()
+
+    private fun matchesPrefix(number: String, prefixes: List<String>): Boolean {
+        if (prefixes.isEmpty()) return true
+        val local = toLocal(number)
+        return prefixes.any { local.startsWith(it) }
+    }
+
+    /** فقط ارقام (اعداد فارسی/عربی به انگلیسی) و علامتِ + ابتدایی. */
+    private fun normalizeDigits(raw: String): String {
+        val sb = StringBuilder()
+        for (c in raw.trim()) {
+            when {
+                c == '+' && sb.isEmpty() -> sb.append('+')
+                Character.isDigit(c) -> sb.append(Character.digit(c, 10))
+            }
+        }
+        return sb.toString()
+    }
+
+    /** شماره را به شکلِ محلیِ «0…» درمی‌آورد تا مقایسهٔ پیش‌شماره/استثنا درست باشد. */
+    private fun toLocal(raw: String): String {
+        var s = normalizeDigits(raw)
+        s = when {
+            s.startsWith("+98") -> "0" + s.substring(3)
+            s.startsWith("0098") -> "0" + s.substring(4)
+            s.startsWith("98") && s.length == 12 -> "0" + s.substring(2)
+            else -> s
+        }
+        return s
     }
 
     private fun isPastEndHour(endHour: Int): Boolean {

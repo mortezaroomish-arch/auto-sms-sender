@@ -42,9 +42,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _stats = MutableStateFlow(Stats())
     val stats: StateFlow<Stats> = _stats.asStateFlow()
 
-    /** فهرست افرادی که امروز پیامک گرفته‌اند (جدیدترین اول). */
-    private val _sentToday = MutableStateFlow<List<Customer>>(emptyList())
-    val sentToday: StateFlow<List<Customer>> = _sentToday.asStateFlow()
+    /** تاریخچهٔ ارسال (جدیدترین اول، حداکثر ۳۰۰ مورد). */
+    private val _history = MutableStateFlow<List<Customer>>(emptyList())
+    val history: StateFlow<List<Customer>> = _history.asStateFlow()
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
@@ -103,11 +103,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         viewModelScope.launch {
-            val text = _settings.value.messageText
-            if (text.isBlank()) {
+            val s = _settings.value
+            if (s.messageText.isBlank()) {
                 _message.value = "متن پیامک خالی است."
                 return@launch
             }
+            // برای تست، اگر شخصی‌سازی روشن است، {نام} با یک نمونه جایگزین می‌شود.
+            val text = if (s.personalizeWithName) s.messageText.replace("{نام}", "دوست") else s.messageText
             val ok = withContext(Dispatchers.IO) { smsSender.send(phoneNumber, text) }
             _message.value = if (ok) "پیامک آزمایشی ارسال شد." else "ارسال پیامک آزمایشی ناموفق بود."
         }
@@ -118,18 +120,37 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val request = OneTimeWorkRequestBuilder<SmsWorker>()
             .setInputData(workDataOf(SmsWorker.KEY_MANUAL to true))
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            .addTag(Scheduler.TAG_SMS)
             .build()
         WorkManager.getInstance(getApplication()).enqueue(request)
         _message.value = "اجرای دستی شروع شد. وضعیت را در اعلان‌ها ببینید."
+    }
+
+    /** توقفِ فوریِ هر ارسالِ در حالِ اجرا و لغوِ زمان‌بندی. */
+    fun stopSending() {
+        val wm = WorkManager.getInstance(getApplication())
+        wm.cancelAllWorkByTag(Scheduler.TAG_SMS)
+        Scheduler.cancel(getApplication())
+        _message.value = "ارسال متوقف شد. برای فعال‌سازی دوباره، تنظیمات را ذخیره کنید."
+    }
+
+    /** پاک‌کردنِ تاریخچه و شروعِ دوباره‌ی چرخه. */
+    fun resetCycle() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { dao.clearAllSent() }
+            refreshStats()
+            _message.value = "تاریخچه پاک شد؛ چرخه از ابتدا شروع می‌شود."
+        }
     }
 
     fun refreshStats() {
         viewModelScope.launch {
             val total = withContext(Dispatchers.IO) { dao.count() }
             val never = withContext(Dispatchers.IO) { dao.countNeverSent() }
-            val today = withContext(Dispatchers.IO) { dao.getSentSince(startOfToday()) }
-            _sentToday.value = today
-            _stats.value = Stats(total, never, today.size)
+            val today = withContext(Dispatchers.IO) { dao.getSentSince(startOfToday()).size }
+            val recent = withContext(Dispatchers.IO) { dao.getRecentSent() }
+            _history.value = recent
+            _stats.value = Stats(total, never, today)
         }
     }
 
@@ -137,7 +158,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _message.value = null
     }
 
-    /** نیمه‌شبِ امروز به میلی‌ثانیه (برای فیلترِ ارسال‌های امروز). */
+    /** نیمه‌شبِ امروز به میلی‌ثانیه (برای شمارشِ ارسال‌های امروز). */
     private fun startOfToday(): Long {
         val c = Calendar.getInstance()
         c.set(Calendar.HOUR_OF_DAY, 0)
