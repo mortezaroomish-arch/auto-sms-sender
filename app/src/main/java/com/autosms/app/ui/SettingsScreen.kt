@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.autosms.app.util.JalaliDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,6 +55,7 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
+    val nextRun by viewModel.nextRun.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
@@ -132,14 +134,16 @@ fun SettingsScreen(
                     }
                 }
 
-                // وضعیت
+                // وضعیت و آمار
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("وضعیت", style = MaterialTheme.typography.titleMedium)
+                        Text("وضعیت و آمار", style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(8.dp))
                         Text("مجموع مخاطبین ذخیره‌شده: ${stats.totalCustomers}")
                         Text("هنوز پیام نگرفته‌اند: ${stats.neverSent}")
                         Text("ارسال‌های امروز: ${stats.sentToday}")
+                        Text("ارسال در این ماه: ${stats.sentThisMonth}")
+                        Text("کلِ ارسال‌شده‌ها تا حالا: ${stats.totalSentEver}")
                         Spacer(Modifier.height(8.dp))
                         OutlinedButton(onClick = { viewModel.syncContacts() }, enabled = !busy) {
                             if (busy) {
@@ -165,8 +169,9 @@ fun SettingsScreen(
                             )
                             Spacer(Modifier.height(4.dp))
                             history.forEach { customer ->
+                                val date = customer.lastSentAt?.let { JalaliDate.format(it) } ?: "-"
                                 Text(
-                                    "• ${customer.name} — ${customer.phoneNumber}\n   ${formatSentDate(customer.lastSentAt)}",
+                                    "• ${customer.name} — ${customer.phoneNumber}\n   $date",
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                             }
@@ -188,19 +193,24 @@ fun SettingsScreen(
 
                 // فعال/غیرفعال
                 Card(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("ارسال خودکار روزانه", style = MaterialTheme.typography.titleMedium)
-                        Switch(
-                            checked = settings.enabled,
-                            onCheckedChange = { checked ->
-                                viewModel.updateSettings { it.copy(enabled = checked) }
-                            }
+                    Column(Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("ارسال خودکار روزانه", style = MaterialTheme.typography.titleMedium)
+                            Switch(
+                                checked = settings.enabled,
+                                onCheckedChange = { checked ->
+                                    viewModel.updateSettings { it.copy(enabled = checked) }
+                                }
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "اجرای بعدی: $nextRun",
+                            style = MaterialTheme.typography.bodySmall
                         )
                     }
                 }
@@ -354,11 +364,4 @@ private fun NumberField(
         singleLine = true,
         modifier = modifier
     )
-}
-
-/** تبدیل زمانِ آخرین ارسال به متنِ خوانا. */
-private fun formatSentDate(timestamp: Long?): String {
-    if (timestamp == null) return "-"
-    val sdf = java.text.SimpleDateFormat("yyyy/MM/dd  HH:mm", java.util.Locale.getDefault())
-    return sdf.format(java.util.Date(timestamp))
 }
