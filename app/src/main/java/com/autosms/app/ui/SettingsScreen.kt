@@ -50,6 +50,7 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
+    val sentToday by viewModel.sentToday.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
 
@@ -105,6 +106,31 @@ fun SettingsScreen(
                             } else {
                                 Text("همگام‌سازی مخاطبین گوشی")
                             }
+                        }
+                    }
+                }
+
+                // ارسال‌های امروز
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(
+                            "ارسال‌های امروز (${sentToday.size} نفر)",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        if (sentToday.isEmpty()) {
+                            Text("امروز هنوز پیامی ارسال نشده است.")
+                        } else {
+                            sentToday.forEach { customer ->
+                                Text(
+                                    "• ${customer.name} — ${customer.phoneNumber}",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(onClick = { viewModel.refreshStats() }) {
+                            Text("به‌روزرسانی لیست")
                         }
                     }
                 }

@@ -34,4 +34,8 @@ interface CustomerDao {
 
     @Query("SELECT MIN(lastSentAt) FROM customers WHERE lastSentAt IS NOT NULL")
     suspend fun oldestSentAt(): Long?
+
+    /** افرادی که از زمانِ داده‌شده به بعد پیام گرفته‌اند (جدیدترین ارسال اول). */
+    @Query("SELECT * FROM customers WHERE lastSentAt >= :since ORDER BY lastSentAt DESC")
+    suspend fun getSentSince(since: Long): List<Customer>
 }

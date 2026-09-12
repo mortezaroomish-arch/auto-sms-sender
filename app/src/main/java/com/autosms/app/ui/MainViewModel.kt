@@ -10,6 +10,7 @@ import androidx.work.workDataOf
 import com.autosms.app.contacts.ContactRepository
 import com.autosms.app.data.AppDatabase
 import com.autosms.app.data.AppSettings
+import com.autosms.app.data.Customer
 import com.autosms.app.data.SettingsRepository
 import com.autosms.app.sms.SmsSender
 import com.autosms.app.work.Scheduler
@@ -20,10 +21,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Calendar
 
 data class Stats(
     val totalCustomers: Int = 0,
-    val neverSent: Int = 0
+    val neverSent: Int = 0,
+    val sentToday: Int = 0
 )
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
@@ -38,6 +41,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _stats = MutableStateFlow(Stats())
     val stats: StateFlow<Stats> = _stats.asStateFlow()
+
+    /** فهرست افرادی که امروز پیامک گرفته‌اند (جدیدترین اول). */
+    private val _sentToday = MutableStateFlow<List<Customer>>(emptyList())
+    val sentToday: StateFlow<List<Customer>> = _sentToday.asStateFlow()
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
@@ -120,11 +127,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val total = withContext(Dispatchers.IO) { dao.count() }
             val never = withContext(Dispatchers.IO) { dao.countNeverSent() }
-            _stats.value = Stats(total, never)
+            val today = withContext(Dispatchers.IO) { dao.getSentSince(startOfToday()) }
+            _sentToday.value = today
+            _stats.value = Stats(total, never, today.size)
         }
     }
 
     fun clearMessage() {
         _message.value = null
+    }
+
+    /** نیمه‌شبِ امروز به میلی‌ثانیه (برای فیلترِ ارسال‌های امروز). */
+    private fun startOfToday(): Long {
+        val c = Calendar.getInstance()
+        c.set(Calendar.HOUR_OF_DAY, 0)
+        c.set(Calendar.MINUTE, 0)
+        c.set(Calendar.SECOND, 0)
+        c.set(Calendar.MILLISECOND, 0)
+        return c.timeInMillis
     }
 }
