@@ -35,6 +35,20 @@ class SmsWorker(
         const val KEY_MANUAL = "manual"
     }
 
+    /**
+     * برای کارهای «فوری» (expedited) مثل دکمهٔ «اجرای دستی» لازم است؛ در گوشی‌های
+     * اندروید ۱۱ و پایین‌تر WorkManager این تابع را صدا می‌زند تا سرویس پیش‌زمینه
+     * را بسازد. نبودِ آن باعث شکستِ کار می‌شود.
+     */
+    override suspend fun getForegroundInfo(): ForegroundInfo {
+        val total = try {
+            settingsRepo.current().dailyCount
+        } catch (_: Exception) {
+            0
+        }
+        return buildForegroundInfo(0, total)
+    }
+
     override suspend fun doWork(): Result {
         val settings = settingsRepo.current()
         // اجرای دستی از داخل برنامه، محدودیتِ فعال‌بودن و بازهٔ زمانی را نادیده می‌گیرد.
