@@ -15,13 +15,13 @@ import com.autosms.app.data.AppDatabase
 import com.autosms.app.data.Customer
 import com.autosms.app.data.SettingsRepository
 import com.autosms.app.sms.SmsSender
+import com.autosms.app.util.PhoneUtil
 import kotlinx.coroutines.delay
 import java.util.Calendar
 
 /**
  * هستهٔ برنامه: هر شب در ساعتِ شروع اجرا می‌شود، مخاطبین جدید را همگام می‌کند،
  * و برای گروهی از مشتریان که بیشترین مدت از آخرین پیامشان گذشته پیامک می‌فرستد.
- * سپس خودش را برای فردا زمان‌بندی می‌کند.
  */
 class SmsWorker(
     private val context: Context,
@@ -49,7 +49,6 @@ class SmsWorker(
 
     override suspend fun doWork(): Result {
         val settings = settingsRepo.current()
-        // اجرای دستی از داخل برنامه، محدودیتِ فعال‌بودن و بازهٔ زمانی را نادیده می‌گیرد.
         val manual = inputData.getBoolean(KEY_MANUAL, false)
         var sent = 0
         var failed = 0
@@ -70,20 +69,22 @@ class SmsWorker(
                 dao.insertNew(allContacts)
             }
 
-            // ۲) انتخاب افرادِ نوبتی با اعمالِ فیلترِ پیش‌شماره و لیستِ استثنا
+            // ۲) انتخاب افرادِ نوبتی با اعمالِ فیلترِ پیش‌شماره، لیستِ استثنا و لیستِ لغو
             val prefixes = parsePrefixes(settings.numberPrefixes)
             val excluded = parseExcluded(settings.excludedNumbers)
+            val optedOut = settingsRepo.currentOptedOut()
+            val blocked = excluded + optedOut
+
             val due = dao.getAllDue()
                 .asSequence()
                 .filter { matchesPrefix(it.phoneNumber, prefixes) }
-                .filter { toLocal(it.phoneNumber) !in excluded }
+                .filter { PhoneUtil.toLocal(it.phoneNumber) !in blocked }
                 .take(settings.dailyCount)
                 .toList()
 
             val delayMillis = settings.delaySeconds.coerceAtLeast(1) * 1000L
 
             for ((index, customer) in due.withIndex()) {
-                // در اجرای زمان‌بندی‌شده، اگر از ساعتِ پایان گذشتیم بقیه به فردا موکول می‌شوند.
                 if (!manual && isPastEndHour(settings.endHour)) break
 
                 val text = buildMessage(settings, customer)
@@ -96,19 +97,15 @@ class SmsWorker(
                 }
                 setForegroundSafe(index + 1, due.size)
 
-                // بین پیام‌ها فاصله بگذار تا به محدودیت ارسالِ اندروید نخوریم.
                 if (index < due.size - 1) {
                     delay(delayMillis)
                 }
             }
 
-            // اعلانِ پایانِ ارسال
             Notifications.showCompletion(context, sent, failed)
 
             return Result.success()
         } finally {
-            // فقط برای اجرای زمان‌بندی‌شده، در حالتِ فعال، و اگر کاربر توقف نکرده باشد،
-            // اجرای فردا را زمان‌بندی کن.
             if (!manual && settings.enabled && !isStopped) {
                 Scheduler.scheduleNext(context, settings.startHour)
             }
@@ -132,43 +129,19 @@ class SmsWorker(
 
     private fun parsePrefixes(raw: String): List<String> =
         raw.split(',', '،', '\n', ' ', ';')
-            .map { normalizeDigits(it) }
+            .map { PhoneUtil.normalizeDigits(it) }
             .filter { it.isNotEmpty() }
 
     private fun parseExcluded(raw: String): Set<String> =
         raw.split(',', '،', '\n', ' ', ';')
-            .map { toLocal(it) }
+            .map { PhoneUtil.toLocal(it) }
             .filter { it.isNotEmpty() }
             .toSet()
 
     private fun matchesPrefix(number: String, prefixes: List<String>): Boolean {
         if (prefixes.isEmpty()) return true
-        val local = toLocal(number)
+        val local = PhoneUtil.toLocal(number)
         return prefixes.any { local.startsWith(it) }
-    }
-
-    /** فقط ارقام (اعداد فارسی/عربی به انگلیسی) و علامتِ + ابتدایی. */
-    private fun normalizeDigits(raw: String): String {
-        val sb = StringBuilder()
-        for (c in raw.trim()) {
-            when {
-                c == '+' && sb.isEmpty() -> sb.append('+')
-                Character.isDigit(c) -> sb.append(Character.digit(c, 10))
-            }
-        }
-        return sb.toString()
-    }
-
-    /** شماره را به شکلِ محلیِ «0…» درمی‌آورد تا مقایسهٔ پیش‌شماره/استثنا درست باشد. */
-    private fun toLocal(raw: String): String {
-        var s = normalizeDigits(raw)
-        s = when {
-            s.startsWith("+98") -> "0" + s.substring(3)
-            s.startsWith("0098") -> "0" + s.substring(4)
-            s.startsWith("98") && s.length == 12 -> "0" + s.substring(2)
-            else -> s
-        }
-        return s
     }
 
     private fun isPastEndHour(endHour: Int): Boolean {
@@ -180,7 +153,6 @@ class SmsWorker(
         try {
             setForeground(buildForegroundInfo(current, total))
         } catch (_: Exception) {
-            // ممکن است به دلیل محدودیت‌های سرویسِ پیش‌زمینه شکست بخورد؛ نادیده می‌گیریم.
         }
     }
 
