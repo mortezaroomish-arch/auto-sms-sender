@@ -49,6 +49,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _nextRun = MutableStateFlow("غیرفعال")
     val nextRun: StateFlow<String> = _nextRun.asStateFlow()
 
+    /** تعداد شماره‌هایی که «لغو» کرده‌اند. */
+    private val _optedOutCount = MutableStateFlow(0)
+    val optedOutCount: StateFlow<Int> = _optedOutCount.asStateFlow()
+
     /** تاریخچهٔ ارسال (جدیدترین اول، حداکثر ۳۰۰ مورد). */
     private val _history = MutableStateFlow<List<Customer>>(emptyList())
     val history: StateFlow<List<Customer>> = _history.asStateFlow()
@@ -150,6 +154,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** پاک‌کردنِ لیستِ کسانی که «لغو» کرده‌اند. */
+    fun clearOptOut() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { settingsRepo.clearOptedOut() }
+            refreshStats()
+            _message.value = "لیستِ لغو پاک شد."
+        }
+    }
+
     fun refreshStats() {
         viewModelScope.launch {
             val total = withContext(Dispatchers.IO) { dao.count() }
@@ -158,7 +171,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val month = withContext(Dispatchers.IO) { dao.countSince(startOfMonth()) }
             val ever = withContext(Dispatchers.IO) { dao.countSent() }
             val recent = withContext(Dispatchers.IO) { dao.getRecentSent() }
+            val optedOut = withContext(Dispatchers.IO) { settingsRepo.currentOptedOut().size }
             _history.value = recent
+            _optedOutCount.value = optedOut
             _stats.value = Stats(total, never, today, month, ever)
             _nextRun.value = if (_settings.value.enabled) {
                 JalaliDate.format(computeNextRun(_settings.value.startHour))
@@ -172,7 +187,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _message.value = null
     }
 
-    /** نیمه‌شبِ امروز به میلی‌ثانیه. */
     private fun startOfToday(): Long {
         val c = Calendar.getInstance()
         c.set(Calendar.HOUR_OF_DAY, 0)
@@ -182,7 +196,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         return c.timeInMillis
     }
 
-    /** ابتدای ماهِ میلادیِ جاری (تقریبِ ساده برای شمارشِ «این ماه»). */
     private fun startOfMonth(): Long {
         val c = Calendar.getInstance()
         c.set(Calendar.DAY_OF_MONTH, 1)
@@ -193,7 +206,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         return c.timeInMillis
     }
 
-    /** زمانِ نزدیک‌ترین ساعتِ شروعِ پیشِ‌رو. */
     private fun computeNextRun(startHour: Int): Long {
         val now = Calendar.getInstance()
         val next = Calendar.getInstance().apply {

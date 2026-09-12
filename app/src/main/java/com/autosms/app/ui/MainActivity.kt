@@ -44,7 +44,9 @@ class MainActivity : ComponentActivity() {
     private fun requiredPermissions(): Array<String> {
         val perms = mutableListOf(
             Manifest.permission.SEND_SMS,
-            Manifest.permission.READ_CONTACTS
+            Manifest.permission.READ_CONTACTS,
+            // برای «لغوِ اشتراکِ خودکار» (اختیاری)
+            Manifest.permission.RECEIVE_SMS
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             perms.add(Manifest.permission.POST_NOTIFICATIONS)

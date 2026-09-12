@@ -56,6 +56,7 @@ fun SettingsScreen(
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
     val nextRun by viewModel.nextRun.collectAsStateWithLifecycle()
+    val optedOutCount by viewModel.optedOutCount.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
@@ -237,6 +238,45 @@ fun SettingsScreen(
                                 "مثال: «سلام دکتر {نام} عزیز». اگر خاموش باشد، متن یکسان به همه ارسال می‌شود.",
                             style = MaterialTheme.typography.bodySmall
                         )
+                    }
+                }
+
+                // لغوِ اشتراکِ خودکار
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("لغوِ اشتراکِ خودکار", style = MaterialTheme.typography.titleMedium)
+                            Switch(
+                                checked = settings.autoOptOut,
+                                onCheckedChange = { checked ->
+                                    viewModel.updateSettings { it.copy(autoOptOut = checked) }
+                                }
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "اگر روشن باشد، هرکس در جواب این کلمه را بفرستد، خودکار از لیست حذف می‌شود " +
+                                "و دیگر پیام نمی‌گیرد. (نیاز به مجوزِ «دریافت پیامک» دارد.)",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = settings.optOutKeyword,
+                            onValueChange = { text -> viewModel.updateSettings { it.copy(optOutKeyword = text) } },
+                            label = { Text("کلمه‌ی لغو") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text("تعداد لغو کرده‌ها: $optedOutCount")
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedButton(onClick = { viewModel.clearOptOut() }) {
+                            Text("پاک‌کردنِ لیستِ لغو")
+                        }
                     }
                 }
 

@@ -4,6 +4,8 @@
 
     <!-- ارسال پیامک -->
     <uses-permission android:name="android.permission.SEND_SMS" />
+    <!-- دریافت پیامک (برای لغوِ اشتراکِ خودکار) -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <!-- خواندن مخاطبین گوشی -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <!-- نمایش اعلان (Android 13+) -->
@@ -46,10 +48,20 @@
             </intent-filter>
         </receiver>
 
+        <!-- دریافتِ پیامکِ ورودی برای لغوِ اشتراکِ خودکار -->
+        <receiver
+            android:name=".work.SmsReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
         <!--
             سرویسِ پیش‌زمینه‌ی WorkManager باید نوعِ dataSync را صریحاً اعلام کند،
-            وگرنه در اندروید ۱۴ به بالا هنگام startForeground برنامه کرش می‌کند
-            (java.lang.IllegalArgumentException: foregroundServiceType ...).
+            وگرنه در اندروید ۱۴ به بالا هنگام startForeground برنامه کرش می‌کند.
         -->
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"

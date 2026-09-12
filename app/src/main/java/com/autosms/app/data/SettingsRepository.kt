@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -25,7 +26,11 @@ data class AppSettings(
     /** فقط شماره‌هایی که با این پیش‌شماره‌ها شروع می‌شوند پیام می‌گیرند (با کاما جدا). خالی = همه. */
     val numberPrefixes: String = "",
     /** شماره‌هایی که هرگز نباید پیام بگیرند (هر شماره در یک خط یا با کاما). */
-    val excludedNumbers: String = ""
+    val excludedNumbers: String = "",
+    /** لغوِ اشتراکِ خودکار: اگر روشن باشد، هرکس در جواب «لغو» بفرستد حذف می‌شود. */
+    val autoOptOut: Boolean = false,
+    /** کلمه‌ای که در پیامِ ورودی نشانهٔ لغو است. */
+    val optOutKeyword: String = "لغو"
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -42,6 +47,9 @@ class SettingsRepository(private val context: Context) {
         val PERSONALIZE = booleanPreferencesKey("personalize_with_name")
         val PREFIXES = stringPreferencesKey("number_prefixes")
         val EXCLUDED = stringPreferencesKey("excluded_numbers")
+        val AUTO_OPT_OUT = booleanPreferencesKey("auto_opt_out")
+        val OPT_OUT_KEYWORD = stringPreferencesKey("opt_out_keyword")
+        val OPTED_OUT = stringSetPreferencesKey("opted_out_numbers")
     }
 
     val settingsFlow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -54,7 +62,9 @@ class SettingsRepository(private val context: Context) {
             delaySeconds = p[Keys.DELAY_SECONDS] ?: 70,
             personalizeWithName = p[Keys.PERSONALIZE] ?: false,
             numberPrefixes = p[Keys.PREFIXES] ?: "",
-            excludedNumbers = p[Keys.EXCLUDED] ?: ""
+            excludedNumbers = p[Keys.EXCLUDED] ?: "",
+            autoOptOut = p[Keys.AUTO_OPT_OUT] ?: false,
+            optOutKeyword = p[Keys.OPT_OUT_KEYWORD] ?: "لغو"
         )
     }
 
@@ -71,6 +81,29 @@ class SettingsRepository(private val context: Context) {
             p[Keys.PERSONALIZE] = settings.personalizeWithName
             p[Keys.PREFIXES] = settings.numberPrefixes
             p[Keys.EXCLUDED] = settings.excludedNumbers
+            p[Keys.AUTO_OPT_OUT] = settings.autoOptOut
+            p[Keys.OPT_OUT_KEYWORD] = settings.optOutKeyword
+        }
+    }
+
+    // ---- لیستِ لغوِ اشتراک (جدا از تنظیمات، چون خودکار پر می‌شود) ----
+
+    val optedOutFlow: Flow<Set<String>> =
+        context.dataStore.data.map { it[Keys.OPTED_OUT] ?: emptySet() }
+
+    suspend fun currentOptedOut(): Set<String> = optedOutFlow.first()
+
+    suspend fun addOptedOut(number: String) {
+        if (number.isBlank()) return
+        context.dataStore.edit { p ->
+            val current = p[Keys.OPTED_OUT] ?: emptySet()
+            p[Keys.OPTED_OUT] = current + number
+        }
+    }
+
+    suspend fun clearOptedOut() {
+        context.dataStore.edit { p ->
+            p[Keys.OPTED_OUT] = emptySet()
         }
     }
 }
