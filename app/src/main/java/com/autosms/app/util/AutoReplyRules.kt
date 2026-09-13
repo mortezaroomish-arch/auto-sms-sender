@@ -32,16 +32,48 @@ object AutoReplyRules {
     }
 
     /**
+     * متن را برای «مقایسه‌ی منعطف» ساده می‌کند تا تفاوت‌های رایجِ نوشتاری مانع تشخیص نشوند:
+     *  - «آ/أ/إ/ٱ» → «ا» (با کلاه و بی‌کلاه یکی می‌شوند)
+     *  - «ي/ئ» (عربی) → «ی» (فارسی)
+     *  - «ك» (عربی) → «ک» (فارسی)
+     *  - «ة» → «ه» ، «ؤ» → «و» ، «ۀ» → «ه»
+     *  - حذفِ اعرابِ عربی، کشیده (ـ) و نیم‌فاصله/علائمِ جهت
+     *  - کوچک‌کردنِ حروفِ لاتین
+     * این‌طور «آدرس» و «ادرس» هر دو یکی حساب می‌شوند.
+     */
+    fun normalizeForMatch(input: String): String {
+        val sb = StringBuilder(input.length)
+        for (ch in input) {
+            // اعرابِ عربی و علامتِ بالانویسِ الف را حذف کن
+            if (ch in '\u064B'..'\u0652' || ch == '\u0670') continue
+            when (ch) {
+                'ـ', '\u200C', '\u200D', '\u200E', '\u200F' -> {} // کشیده، نیم‌فاصله، علائمِ جهت → حذف
+                'آ', 'أ', 'إ', 'ٱ', 'ا' -> sb.append('ا')
+                'ي', 'ئ', 'ی' -> sb.append('ی')
+                'ك' -> sb.append('ک')
+                'ة' -> sb.append('ه')
+                'ۀ' -> sb.append('ه')
+                'ؤ' -> sb.append('و')
+                else -> sb.append(ch)
+            }
+        }
+        return sb.toString().lowercase().trim()
+    }
+
+    /**
      * جوابِ مناسب برای یک پیامِ ورودی را برمی‌گرداند:
-     * ۱) اولین قانونی که کلیدواژه‌اش در متن باشد،
+     * ۱) اولین قانونی که کلیدواژه‌اش (با مقایسه‌ی منعطف) در متن باشد،
      * ۲) وگرنه جوابِ پیش‌فرض،
      * ۳) اگر هیچ‌کدام نبود، null (یعنی چیزی فرستاده نشود).
      */
     fun findReply(body: String, rulesRaw: String, default: String): String? {
-        val text = body.trim()
-        if (text.isNotEmpty()) {
+        val normalizedBody = normalizeForMatch(body)
+        if (normalizedBody.isNotEmpty()) {
             for ((keyword, reply) in parse(rulesRaw)) {
-                if (text.contains(keyword, ignoreCase = true)) return reply
+                val normalizedKeyword = normalizeForMatch(keyword)
+                if (normalizedKeyword.isNotEmpty() && normalizedBody.contains(normalizedKeyword)) {
+                    return reply
+                }
             }
         }
         val fallback = default.trim()
