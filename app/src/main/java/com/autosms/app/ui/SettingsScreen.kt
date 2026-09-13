@@ -69,17 +69,12 @@ fun SettingsScreen(
     val history by viewModel.history.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
-    val contactQuery by viewModel.contactQuery.collectAsStateWithLifecycle()
-    val contactResults by viewModel.contactResults.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
     var testNumber by rememberSaveable { mutableStateOf("") }
     var showResetDialog by remember { mutableStateOf(false) }
     var showRunDialog by remember { mutableStateOf(false) }
-    var newContactName by rememberSaveable { mutableStateOf("") }
-    var newContactPhone by rememberSaveable { mutableStateOf("") }
     var historyExpanded by rememberSaveable { mutableStateOf(false) }
-    var contactsExpanded by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
     val receiveSmsLauncher = rememberLauncherForActivityResult(
@@ -232,103 +227,6 @@ fun SettingsScreen(
                             ) {
                                 Text("شروع دوره‌ی جدید")
                             }
-                        }
-                    }
-                }
-
-                // مدیریتِ مخاطبین
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("مدیریتِ مخاطبین", style = MaterialTheme.typography.titleMedium)
-                            TextButton(onClick = { contactsExpanded = !contactsExpanded }) {
-                                Text(if (contactsExpanded) "بستن ▲" else "نمایش ▼")
-                            }
-                        }
-                        if (!contactsExpanded) {
-                            Text(
-                                "برای افزودن، جست‌وجو یا حذفِ مخاطب، «نمایش» را بزن.",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                        if (contactsExpanded) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "افزودنِ دستیِ مخاطب یا حذفِ مخاطب. اگر شماره‌ای که وارد می‌کنی از قبل باشد، فقط نامش به‌روز می‌شود.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = newContactName,
-                            onValueChange = { newContactName = it },
-                            label = { Text("نام") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = newContactPhone,
-                            onValueChange = { newContactPhone = it },
-                            label = { Text("شماره") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedButton(
-                            onClick = {
-                                viewModel.addOrUpdateContact(newContactName, newContactPhone)
-                                newContactName = ""
-                                newContactPhone = ""
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("افزودن / ذخیرهٔ مخاطب")
-                        }
-
-                        Spacer(Modifier.height(12.dp))
-                        Divider()
-                        Spacer(Modifier.height(12.dp))
-
-                        OutlinedTextField(
-                            value = contactQuery,
-                            onValueChange = { viewModel.setContactQuery(it) },
-                            label = { Text("جست‌وجوی مخاطب (نام یا شماره)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        if (contactResults.isEmpty()) {
-                            Text("مخاطبی برای نمایش نیست.", style = MaterialTheme.typography.bodySmall)
-                        } else {
-                            Text(
-                                "نمایشِ ${contactResults.size} مخاطب:",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            contactResults.forEach { customer ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        "• ${customer.name} — ${customer.phoneNumber}",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    TextButton(
-                                        onClick = { viewModel.deleteContact(customer.phoneNumber) }
-                                    ) {
-                                        Text("حذف", color = Color(0xFFB00020))
-                                    }
-                                }
-                            }
-                        }
                         }
                     }
                 }
