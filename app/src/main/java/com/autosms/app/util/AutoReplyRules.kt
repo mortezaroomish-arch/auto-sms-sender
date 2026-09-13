@@ -47,4 +47,22 @@ object AutoReplyRules {
         val fallback = default.trim()
         return if (fallback.isEmpty()) null else fallback
     }
+
+    /**
+     * آیا این متن، خودش یکی از «جواب‌های خودکارِ ما» است؟
+     *
+     * وقتی به شماره‌ی خودمان تست می‌کنیم (یا طرفِ مقابل هم پاسخِ خودکار دارد)، جوابِ خودمان
+     * دوباره به‌عنوان پیامِ ورودی برمی‌گردد و یک «حلقه‌ی بی‌پایان» می‌سازد. اگر متنِ دریافتی
+     * دقیقاً برابرِ جوابِ پیش‌فرض یا یکی از جواب‌های قانون‌ها باشد، آن را جوابِ خودمان می‌شماریم
+     * و دیگر جواب نمی‌دهیم.
+     */
+    fun isOwnReply(body: String, rulesRaw: String, default: String): Boolean {
+        val text = body.trim()
+        if (text.isEmpty()) return false
+        if (default.trim().isNotEmpty() && text == default.trim()) return true
+        for ((_, reply) in parse(rulesRaw)) {
+            if (text == reply.trim()) return true
+        }
+        return false
+    }
 }
