@@ -316,30 +316,6 @@ fun SettingsScreen(
                     }
                 }
 
-                // شخصی‌سازی با نام
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("👤 شخصی‌سازی با نام", style = MaterialTheme.typography.titleMedium)
-                            Switch(
-                                checked = settings.personalizeWithName,
-                                onCheckedChange = { checked ->
-                                    viewModel.updateSettings { it.copy(personalizeWithName = checked) }
-                                }
-                            )
-                        }
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "«(نام)» در متن با نامِ مخاطب جایگزین می‌شود.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
-
                 // لغوِ اشتراکِ خودکار
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
@@ -474,6 +450,30 @@ fun SettingsScreen(
                             placeholder = { Text("در اسرع وقت با شما تماس می‌گیرم") },
                             modifier = Modifier.fillMaxWidth(),
                             minLines = 2
+                        )
+                    }
+                }
+
+                // شخصی‌سازی با نام (بالای متن‌ها، چون به متن مربوط است)
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("👤 شخصی‌سازی با نام", style = MaterialTheme.typography.titleMedium)
+                            Switch(
+                                checked = settings.personalizeWithName,
+                                onCheckedChange = { checked ->
+                                    viewModel.updateSettings { it.copy(personalizeWithName = checked) }
+                                }
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "«(نام)» در متن با نامِ مخاطب جایگزین می‌شود.",
+                            style = MaterialTheme.typography.bodySmall
                         )
                     }
                 }
@@ -697,16 +697,33 @@ private fun MessageListEditor(
         }
     }
 
+    var messagesExpanded by rememberSaveable { mutableStateOf(false) }
+
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
-            Text("✉️ متن‌های پیامک", style = MaterialTheme.typography.titleMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("✉️ متن‌های پیامک", style = MaterialTheme.typography.titleMedium)
+                TextButton(onClick = { messagesExpanded = !messagesExpanded }) {
+                    Text(if (messagesExpanded) "بستن ▲" else "تغییر ▼")
+                }
+            }
             Spacer(Modifier.height(4.dp))
-            Text(
-                "برای هر متن یک کادر. با «افزودن متن» چند متن داشته باش.",
-                style = MaterialTheme.typography.bodySmall
-            )
-            Spacer(Modifier.height(12.dp))
-            messages.forEachIndexed { index, msg ->
+            if (!messagesExpanded) {
+                Text(
+                    "تعداد متن‌ها: ${messages.count { it.isNotBlank() }} — برای نوشتن/ویرایش «تغییر» را بزن.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            } else {
+                Text(
+                    "برای هر متن یک کادر. با «افزودن متن» چند متن داشته باش.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Spacer(Modifier.height(12.dp))
+                messages.forEachIndexed { index, msg ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -734,14 +751,15 @@ private fun MessageListEditor(
                 )
                 Spacer(Modifier.height(12.dp))
             }
-            OutlinedButton(
-                onClick = {
-                    messages.add("")
-                    onChange(messages.joinToString(separator))
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("➕ افزودن متن")
+                OutlinedButton(
+                    onClick = {
+                        messages.add("")
+                        onChange(messages.joinToString(separator))
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("➕ افزودن متن")
+                }
             }
         }
     }
