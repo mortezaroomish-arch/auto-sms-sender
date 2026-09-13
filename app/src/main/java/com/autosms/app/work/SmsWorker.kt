@@ -89,12 +89,26 @@ class SmsWorker(
             val cycleStart = settingsRepo.currentCycleStart()
             var pool = eligible.filter { it.lastSentAt == null || it.lastSentAt < cycleStart }
 
-            // اگر همه در این چرخه پیام گرفته‌اند، چرخهٔ تازه‌ای از ابتدای الفبا شروع می‌شود.
+            // اگر همه در این چرخه پیام گرفته‌اند، چرخهٔ تازه‌ای از ابتدای الفبا شروع می‌شود
+            // و شمارهٔ متن یکی جلو می‌رود تا در دوره‌ی جدید متنِ تکراری فرستاده نشود.
             if (pool.isEmpty() && eligible.isNotEmpty()) {
                 val now = System.currentTimeMillis()
                 settingsRepo.setCycleStart(now)
+                settingsRepo.setCycleMessageIndex(settingsRepo.currentCycleMessageIndex() + 1)
                 pool = eligible
             }
+
+            // انتخابِ متن برای این دوره:
+            //  - اگر «ترتیبی» روشن باشد و چند متن باشد: متنِ این دوره بر اساسِ شمارهٔ دوره
+            //    (هر دوره متنِ بعدی؛ پس تکراری فرستاده نمی‌شود).
+            //  - در غیرِ این‌صورت: همیشه متنِ پیش‌فرض (اولین متن) فرستاده می‌شود.
+            val variants = MessageTemplates.variants(settings.messageText)
+            val messageForCycle: String =
+                if (settings.sequentialMessages && variants.size > 1) {
+                    variants[settingsRepo.currentCycleMessageIndex() % variants.size]
+                } else {
+                    variants.firstOrNull() ?: settings.messageText.trim()
+                }
 
             // مرتب‌سازی «بر اساسِ نامِ الفباییِ فارسی» به‌عنوانِ کلیدِ اصلی (نه تاریخِ ارسال)،
             // با پاک‌کردنِ پیشوندِ «دکتر» تا احمد زیرِ «الف» بیاید نه «د». هم‌نام‌ها با شماره
@@ -113,7 +127,7 @@ class SmsWorker(
             for ((index, customer) in due.withIndex()) {
                 if (!manual && isPastEndHour(settings.endHour)) break
 
-                val text = buildMessage(settings, customer)
+                val text = buildMessage(settings, customer, messageForCycle)
                 val ok = smsSender.send(customer.phoneNumber, text)
                 if (ok) {
                     dao.markSent(customer.phoneNumber, System.currentTimeMillis())
@@ -141,14 +155,13 @@ class SmsWorker(
     }
 
     /**
-     * ساختِ متنِ پیام: اگر چند متنِ چرخشی تعریف شده باشد یکی تصادفی انتخاب می‌شود،
-     * سپس در صورتِ روشن‌بودنِ شخصی‌سازی، {نام} با نامِ مخاطب جایگزین می‌گردد.
+     * ساختِ متنِ پیام از متنِ انتخاب‌شدهٔ این دوره. در صورتِ روشن‌بودنِ شخصی‌سازی،
+     * {نام} با نامِ مخاطب جایگزین می‌شود.
      */
-    private fun buildMessage(settings: AppSettings, customer: Customer): String {
-        val base = MessageTemplates.pick(settings.messageText)
-        if (!settings.personalizeWithName) return base
+    private fun buildMessage(settings: AppSettings, customer: Customer, template: String): String {
+        if (!settings.personalizeWithName) return template
         val name = cleanName(customer.name)
-        return base.replace("{نام}", name)
+        return template.replace("{نام}", name)
     }
 
     /** حذفِ «دکتر»ِ ابتداییِ نام تا هنگام شخصی‌سازی تکراری نشود. */

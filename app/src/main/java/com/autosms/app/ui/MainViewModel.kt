@@ -134,7 +134,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _message.value = "متن پیامک خالی است."
                 return@launch
             }
-            val base = MessageTemplates.pick(s.messageText)
+            val base = MessageTemplates.variants(s.messageText).firstOrNull() ?: s.messageText.trim()
             val text = if (s.personalizeWithName) base.replace("{نام}", "دوست") else base
             val ok = withContext(Dispatchers.IO) { smsSender.send(phoneNumber, text) }
             _message.value = if (ok) "پیامک آزمایشی ارسال شد." else "ارسال پیامک آزمایشی ناموفق بود."
@@ -241,7 +241,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         customers = dao.getAll(),
                         settings = settingsRepo.current(),
                         optedOut = settingsRepo.currentOptedOut(),
-                        cycleStart = settingsRepo.currentCycleStart()
+                        cycleStart = settingsRepo.currentCycleStart(),
+                        cycleMessageIndex = settingsRepo.currentCycleMessageIndex()
                     )
                 }
                 withContext(Dispatchers.IO) {
@@ -272,6 +273,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     settingsRepo.update(backup.settings)
                     settingsRepo.setOptedOut(backup.optedOut)
                     settingsRepo.setCycleStart(backup.cycleStart)
+                    settingsRepo.setCycleMessageIndex(backup.cycleMessageIndex)
                 }
                 _settings.value = settingsRepo.current()
                 searchContacts()
