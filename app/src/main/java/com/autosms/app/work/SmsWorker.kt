@@ -152,12 +152,29 @@ class SmsWorker(
     }
 
     /**
-     * کلیدِ مرتب‌سازیِ الفبایی: نامِ پاک‌شده از پیشوندِ «دکتر». نام‌های خالی با یک
-     * نویسهٔ بالا به انتهای فهرست می‌روند تا ترتیبِ الفبایی خراب نشود.
+     * کلیدِ مرتب‌سازیِ الفبایی. برای اینکه حروف قاطی نشوند:
+     *  ۱) پیشوندِ «دکتر» حذف می‌شود؛
+     *  ۲) واریانت‌های عربیِ حروف به معادلِ فارسی یکسان می‌شوند
+     *     (ي→ی، ك→ک، أ/إ/آ/ٱ→ا، ة→ه، ؤ→و، ئ→ی)؛
+     *  ۳) اعرابِ عربی، «ـ»ِ کشیده و نیم‌فاصله حذف و فاصله‌های ابتدایی/انتهایی گرفته می‌شوند.
+     * نام‌های خالی با یک نویسهٔ بالا به انتهای فهرست می‌روند تا ترتیب خراب نشود.
      */
     private fun nameSortKey(raw: String): String {
-        val cleaned = cleanName(raw)
-        return if (cleaned.isBlank()) "\uFFFF" else cleaned
+        val sb = StringBuilder()
+        for (ch in cleanName(raw)) {
+            when (ch) {
+                'ي', 'ئ', 'ى' -> sb.append('ی')
+                'ك' -> sb.append('ک')
+                'أ', 'إ', 'آ', 'ٱ', 'ا' -> sb.append('ا')
+                'ة' -> sb.append('ه')
+                'ؤ' -> sb.append('و')
+                '\u200C', '\u0640' -> {} // نیم‌فاصله و «ـ»ِ کشیده حذف شوند
+                in '\u064B'..'\u0652' -> {} // اعرابِ عربی (فتحه/کسره/…) حذف شوند
+                else -> sb.append(ch)
+            }
+        }
+        val key = sb.toString().trim()
+        return if (key.isBlank()) "\uFFFF" else key
     }
 
     private fun parsePrefixes(raw: String): List<String> =
