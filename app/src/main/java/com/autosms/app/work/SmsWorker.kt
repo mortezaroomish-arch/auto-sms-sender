@@ -77,16 +77,32 @@ class SmsWorker(
             val optedOut = settingsRepo.currentOptedOut()
             val blocked = excluded + optedOut
 
-            // مرتب‌سازی: اول کسانی که این دوره هنوز پیام نگرفته‌اند (تاریخِ قدیمی‌تر جلوتر)،
-            // و بینِ هم‌رتبه‌ها به‌ترتیبِ الفبای فارسیِ نام. این‌طور ارسال الفبایی جلو می‌رود
-            // و مخاطبِ جدید سرِ جای الفباییِ خودش وارد می‌شود (جا نمی‌ماند).
-            val faCollator = Collator.getInstance(Locale("fa"))
-            val due = dao.getAllDue()
+            val eligible = dao.getAllDue()
                 .filter { matchesPrefix(it.phoneNumber, prefixes) }
                 .filter { PhoneUtil.toLocal(it.phoneNumber) !in blocked }
+
+            // چرخهٔ الفبایی:
+            // «نوبتِ این چرخه نرسیده» = هرگز پیام نگرفته، یا آخرین پیامش پیش از شروعِ چرخهٔ فعلی بوده.
+            // مخاطبِ جدید (بدونِ تاریخِ ارسال) همیشه واجدِ شرایط است و سرِ جای الفباییِ خودش
+            // وارد می‌شود؛ پس اگر وسطِ «ب» یک «الف» اضافه شود، شبِ بعد اول همان «الف» می‌رود.
+            val cycleStart = settingsRepo.currentCycleStart()
+            var pool = eligible.filter { it.lastSentAt == null || it.lastSentAt < cycleStart }
+
+            // اگر همه در این چرخه پیام گرفته‌اند، چرخهٔ تازه‌ای از ابتدای الفبا شروع می‌شود.
+            if (pool.isEmpty() && eligible.isNotEmpty()) {
+                val now = System.currentTimeMillis()
+                settingsRepo.setCycleStart(now)
+                pool = eligible
+            }
+
+            // مرتب‌سازی «بر اساسِ نامِ الفباییِ فارسی» به‌عنوانِ کلیدِ اصلی (نه تاریخِ ارسال)،
+            // با پاک‌کردنِ پیشوندِ «دکتر» تا احمد زیرِ «الف» بیاید نه «د». هم‌نام‌ها با شماره
+            // مرتب می‌شوند تا ترتیب پایدار بماند.
+            val faCollator = Collator.getInstance(Locale("fa"))
+            val due = pool
                 .sortedWith(
-                    compareBy<Customer> { it.lastSentAt ?: Long.MIN_VALUE }
-                        .thenComparator { a, b -> faCollator.compare(a.name, b.name) }
+                    Comparator<Customer> { a, b -> faCollator.compare(nameSortKey(a.name), nameSortKey(b.name)) }
+                        .thenBy { it.phoneNumber }
                 )
                 .take(settings.dailyCount)
 
@@ -133,6 +149,15 @@ class SmsWorker(
         if (n.startsWith("دکتر")) n = n.removePrefix("دکتر").trim()
         if (n.startsWith("دكتر")) n = n.removePrefix("دكتر").trim()
         return n
+    }
+
+    /**
+     * کلیدِ مرتب‌سازیِ الفبایی: نامِ پاک‌شده از پیشوندِ «دکتر». نام‌های خالی با یک
+     * نویسهٔ بالا به انتهای فهرست می‌روند تا ترتیبِ الفبایی خراب نشود.
+     */
+    private fun nameSortKey(raw: String): String {
+        val cleaned = cleanName(raw)
+        return if (cleaned.isBlank()) "\uFFFF" else cleaned
     }
 
     private fun parsePrefixes(raw: String): List<String> =

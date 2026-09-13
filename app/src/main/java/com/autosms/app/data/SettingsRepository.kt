@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -50,6 +51,7 @@ class SettingsRepository(private val context: Context) {
         val AUTO_OPT_OUT = booleanPreferencesKey("auto_opt_out")
         val OPT_OUT_KEYWORD = stringPreferencesKey("opt_out_keyword")
         val OPTED_OUT = stringSetPreferencesKey("opted_out_numbers")
+        val CYCLE_START = longPreferencesKey("cycle_start_at")
     }
 
     val settingsFlow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -104,6 +106,21 @@ class SettingsRepository(private val context: Context) {
     suspend fun clearOptedOut() {
         context.dataStore.edit { p ->
             p[Keys.OPTED_OUT] = emptySet()
+        }
+    }
+
+    // ---- چرخهٔ ارسالِ الفبایی ----
+    // زمانِ شروعِ چرخهٔ فعلی. هرکس که آخرین ارسالش قبل از این زمان بوده (یا اصلاً
+    // پیام نگرفته) هنوز «نوبتش این چرخه نرسیده» و واجدِ شرایطِ ارسال است.
+
+    /** زمانِ شروعِ چرخهٔ فعلی (۰ یعنی هنوز چرخه‌ای شروع نشده = همه واجدِ شرایط‌اند). */
+    suspend fun currentCycleStart(): Long =
+        context.dataStore.data.map { it[Keys.CYCLE_START] ?: 0L }.first()
+
+    /** شروعِ چرخهٔ جدید: از این لحظه به بعد، همهٔ مخاطبین دوباره نوبت می‌گیرند. */
+    suspend fun setCycleStart(timestamp: Long) {
+        context.dataStore.edit { p ->
+            p[Keys.CYCLE_START] = timestamp
         }
     }
 }
