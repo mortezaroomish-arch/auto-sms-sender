@@ -83,6 +83,9 @@ fun SettingsScreen(
     val receiveSmsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { }
+    val phonePermsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { }
 
     // انتخابِ فایل برای ذخیره/خواندنِ پشتیبان
     val exportLauncher = rememberLauncherForActivityResult(
@@ -434,6 +437,58 @@ fun SettingsScreen(
                                 "نکته: فقط به شماره‌های موبایلِ واقعی جواب داده می‌شود (نه اپراتور/بانک/کدهای خدماتی).\n" +
                                 "نکته: تغییرات پس از زدنِ دکمهٔ «💾 ذخیرهٔ تنظیمات» اعمال می‌شوند.\n" +
                                 "توجه: هر پاسخِ خودکار یک پیامکِ واقعی از سیم‌کارتِ توست و هزینه دارد.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+
+                // پیامک برای تماسِ بی‌پاسخ
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("📞 پیامک برای تماسِ بی‌پاسخ", style = MaterialTheme.typography.titleMedium)
+                            Switch(
+                                checked = settings.missedCallReplyEnabled,
+                                onCheckedChange = { checked ->
+                                    viewModel.updateSettings { it.copy(missedCallReplyEnabled = checked) }
+                                    if (checked) {
+                                        val needed = mutableListOf<String>()
+                                        if (ContextCompat.checkSelfPermission(
+                                                context, Manifest.permission.READ_PHONE_STATE
+                                            ) != PackageManager.PERMISSION_GRANTED
+                                        ) needed.add(Manifest.permission.READ_PHONE_STATE)
+                                        if (ContextCompat.checkSelfPermission(
+                                                context, Manifest.permission.READ_CALL_LOG
+                                            ) != PackageManager.PERMISSION_GRANTED
+                                        ) needed.add(Manifest.permission.READ_CALL_LOG)
+                                        if (needed.isNotEmpty()) phonePermsLauncher.launch(needed.toTypedArray())
+                                    }
+                                }
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "اگر روشن باشد، وقتی کسی زنگ بزند و جواب ندهی (تماسِ بی‌پاسخ)، این پیام خودکار " +
+                                "برایش فرستاده می‌شود. (نیاز به مجوزِ تلفن و گزارشِ تماس‌ها دارد.)",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = settings.missedCallReplyText,
+                            onValueChange = { text -> viewModel.updateSettings { it.copy(missedCallReplyText = text) } },
+                            label = { Text("متنِ تماسِ بی‌پاسخ") },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 2
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "فقط برای تماسِ بی‌پاسخ فرستاده می‌شود (نه تماسِ جواب‌داده‌شده یا خروجی). " +
+                                "برای هر شماره در چند دقیقه فقط یک بار، و فقط به شماره‌های موبایلِ واقعی.\n" +
+                                "نکته: تغییرات پس از زدنِ دکمهٔ «💾 ذخیرهٔ تنظیمات» اعمال می‌شوند.",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }

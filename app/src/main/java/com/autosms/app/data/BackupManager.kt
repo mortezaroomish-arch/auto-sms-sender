@@ -49,6 +49,8 @@ object BackupManager {
         s.put("autoReplyEnabled", settings.autoReplyEnabled)
         s.put("autoReplyDefault", settings.autoReplyDefault)
         s.put("autoReplyRules", settings.autoReplyRules)
+        s.put("missedCallReplyEnabled", settings.missedCallReplyEnabled)
+        s.put("missedCallReplyText", settings.missedCallReplyText)
         root.put("settings", s)
 
         val arr = JSONArray()
@@ -90,7 +92,9 @@ object BackupManager {
             optOutKeyword = s.optString("optOutKeyword", "لغو"),
             autoReplyEnabled = s.optBoolean("autoReplyEnabled", false),
             autoReplyDefault = s.optString("autoReplyDefault", ""),
-            autoReplyRules = s.optString("autoReplyRules", "")
+            autoReplyRules = s.optString("autoReplyRules", ""),
+            missedCallReplyEnabled = s.optBoolean("missedCallReplyEnabled", false),
+            missedCallReplyText = s.optString("missedCallReplyText", "در اسرع وقت با شما تماس می‌گیرم")
         )
 
         val customers = mutableListOf<Customer>()
