@@ -156,12 +156,12 @@ class SmsWorker(
 
     /**
      * ساختِ متنِ پیام از متنِ انتخاب‌شدهٔ این دوره. در صورتِ روشن‌بودنِ شخصی‌سازی،
-     * {نام} با نامِ مخاطب جایگزین می‌شود.
+     * «(نام)» با نامِ مخاطب جایگزین می‌شود (برای سازگاری، «{نام}» هم پشتیبانی می‌شود).
      */
     private fun buildMessage(settings: AppSettings, customer: Customer, template: String): String {
         if (!settings.personalizeWithName) return template
         val name = cleanName(customer.name)
-        return template.replace("{نام}", name)
+        return template.replace("(نام)", name).replace("{نام}", name)
     }
 
     /** حذفِ «دکتر»ِ ابتداییِ نام تا هنگام شخصی‌سازی تکراری نشود. */
