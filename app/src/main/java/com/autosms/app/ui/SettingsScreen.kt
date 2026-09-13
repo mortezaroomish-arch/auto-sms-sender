@@ -21,7 +21,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
@@ -51,6 +53,7 @@ import androidx.core.content.ContextCompat
 import android.Manifest
 import android.content.pm.PackageManager
 import com.autosms.app.util.JalaliDate
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,6 +78,7 @@ fun SettingsScreen(
     var showRunDialog by remember { mutableStateOf(false) }
     var newContactName by rememberSaveable { mutableStateOf("") }
     var newContactPhone by rememberSaveable { mutableStateOf("") }
+    var historyExpanded by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
     val receiveSmsLauncher = rememberLauncherForActivityResult(
@@ -179,13 +183,29 @@ fun SettingsScreen(
                     }
                 }
 
-                // تاریخچه‌ی ارسال
+                // تاریخچه‌ی ارسال (به‌صورتِ پیش‌فرض بسته تا لازم نباشد اسکرول کنی)
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("تاریخچه‌ی ارسال", style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("تاریخچه‌ی ارسال", style = MaterialTheme.typography.titleMedium)
+                            if (history.isNotEmpty()) {
+                                TextButton(onClick = { historyExpanded = !historyExpanded }) {
+                                    Text(if (historyExpanded) "بستن ▲" else "نمایش ▼")
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
                         if (history.isEmpty()) {
                             Text("هنوز پیامی ارسال نشده است.")
+                        } else if (!historyExpanded) {
+                            Text(
+                                "${history.size} ارسالِ اخیر ذخیره شده. برای دیدن، «نمایش» را بزن.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
                         } else {
                             Text(
                                 "آخرین ${history.size} ارسال (جدیدترین اول):",
@@ -426,40 +446,42 @@ fun SettingsScreen(
                 )
 
                 // تعداد روزانه
-                NumberField(
+                SliderField(
                     label = "تعداد ارسال در هر روز",
                     value = settings.dailyCount,
+                    min = 1,
+                    max = 500,
                     onValueChange = { v -> viewModel.updateSettings { it.copy(dailyCount = v) } }
                 )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    NumberField(
-                        label = "ساعت شروع (۰ تا ۲۳)",
-                        value = settings.startHour,
-                        onValueChange = { v ->
-                            viewModel.updateSettings { it.copy(startHour = v.coerceIn(0, 23)) }
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                    NumberField(
-                        label = "ساعت پایان (۰ تا ۲۳)",
-                        value = settings.endHour,
-                        onValueChange = { v ->
-                            viewModel.updateSettings { it.copy(endHour = v.coerceIn(0, 23)) }
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                SliderField(
+                    label = "ساعت شروع",
+                    value = settings.startHour,
+                    min = 0,
+                    max = 23,
+                    onValueChange = { v -> viewModel.updateSettings { it.copy(startHour = v) } }
+                )
+                SliderField(
+                    label = "ساعت پایان",
+                    value = settings.endHour,
+                    min = 0,
+                    max = 23,
+                    onValueChange = { v -> viewModel.updateSettings { it.copy(endHour = v) } }
+                )
 
-                NumberField(
+                SliderField(
                     label = "فاصله بین پیام‌ها (ثانیه)",
                     value = settings.delaySeconds,
+                    min = 5,
+                    max = 300,
                     onValueChange = { v -> viewModel.updateSettings { it.copy(delaySeconds = v) } }
                 )
 
-                NumberField(
+                SliderField(
                     label = "حداکثرِ فاصله (ثانیه) — ۰ یعنی ثابت",
                     value = settings.delayMaxSeconds,
+                    min = 0,
+                    max = 300,
                     onValueChange = { v -> viewModel.updateSettings { it.copy(delayMaxSeconds = v) } }
                 )
                 Text(
@@ -544,22 +566,43 @@ fun SettingsScreen(
     }
 }
 
+/**
+ * انتخابِ عدد به‌صورتِ کشویی (اسلایدر) به‌جای تایپ. مقدار در بالا نمایش داده می‌شود
+ * و دکمه‌های − و + برای تنظیمِ دقیقِ یک‌واحدی هم کنارِ آن هست.
+ */
 @Composable
-private fun NumberField(
+private fun SliderField(
     label: String,
     value: Int,
+    min: Int,
+    max: Int,
     onValueChange: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    OutlinedTextField(
-        value = value.toString(),
-        onValueChange = { text ->
-            val n = text.filter { it.isDigit() }.toIntOrNull() ?: 0
-            onValueChange(n)
-        },
-        label = { Text(label) },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        singleLine = true,
-        modifier = modifier
-    )
+    val current = value.coerceIn(min, max)
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            IconButton(onClick = { onValueChange((current - 1).coerceIn(min, max)) }) {
+                Text("−", style = MaterialTheme.typography.titleLarge)
+            }
+            Text(
+                current.toString(),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+            IconButton(onClick = { onValueChange((current + 1).coerceIn(min, max)) }) {
+                Text("+", style = MaterialTheme.typography.titleLarge)
+            }
+        }
+        Slider(
+            value = current.toFloat(),
+            onValueChange = { onValueChange(it.roundToInt().coerceIn(min, max)) },
+            valueRange = min.toFloat()..max.toFloat()
+        )
+    }
 }
