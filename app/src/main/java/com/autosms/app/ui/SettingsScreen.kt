@@ -52,6 +52,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import android.Manifest
 import android.content.pm.PackageManager
+import com.autosms.app.data.Customer
 import com.autosms.app.util.JalaliDate
 import kotlin.math.roundToInt
 
@@ -80,6 +81,7 @@ fun SettingsScreen(
     var newContactPhone by rememberSaveable { mutableStateOf("") }
     var historyExpanded by rememberSaveable { mutableStateOf(false) }
     var contactsExpanded by rememberSaveable { mutableStateOf(false) }
+    var contactToDelete by remember { mutableStateOf<Customer?>(null) }
 
     val context = LocalContext.current
     val receiveSmsLauncher = rememberLauncherForActivityResult(
@@ -114,6 +116,23 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showResetDialog = false }) { Text("انصراف") }
+            }
+        )
+    }
+
+    contactToDelete?.let { target ->
+        AlertDialog(
+            onDismissRequest = { contactToDelete = null },
+            title = { Text("حذفِ مخاطب؟") },
+            text = { Text("«${target.name}» با شماره‌ی ${target.phoneNumber} حذف شود؟ این کار قابلِ بازگشت نیست.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteContact(target.phoneNumber)
+                    contactToDelete = null
+                }) { Text("بله، حذف کن") }
+            },
+            dismissButton = {
+                TextButton(onClick = { contactToDelete = null }) { Text("انصراف") }
             }
         )
     }
@@ -322,7 +341,7 @@ fun SettingsScreen(
                                         modifier = Modifier.weight(1f)
                                     )
                                     TextButton(
-                                        onClick = { viewModel.deleteContact(customer.phoneNumber) }
+                                        onClick = { contactToDelete = customer }
                                     ) {
                                         Text("حذف", color = Color(0xFFB00020))
                                     }
