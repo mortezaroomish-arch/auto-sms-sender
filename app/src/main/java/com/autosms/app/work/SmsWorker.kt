@@ -15,6 +15,7 @@ import com.autosms.app.data.AppDatabase
 import com.autosms.app.data.Customer
 import com.autosms.app.data.SettingsRepository
 import com.autosms.app.sms.SmsSender
+import com.autosms.app.util.MessageTemplates
 import com.autosms.app.util.PhoneUtil
 import kotlinx.coroutines.delay
 import java.text.Collator
@@ -106,7 +107,8 @@ class SmsWorker(
                 )
                 .take(settings.dailyCount)
 
-            val delayMillis = settings.delaySeconds.coerceAtLeast(1) * 1000L
+            val minDelay = settings.delaySeconds.coerceAtLeast(1)
+            val maxDelay = settings.delayMaxSeconds
 
             for ((index, customer) in due.withIndex()) {
                 if (!manual && isPastEndHour(settings.endHour)) break
@@ -122,7 +124,9 @@ class SmsWorker(
                 setForegroundSafe(index + 1, due.size)
 
                 if (index < due.size - 1) {
-                    delay(delayMillis)
+                    // فاصلهٔ تصادفی بینِ حداقل و حداکثر (اگر حداکثر بزرگ‌تر باشد)؛ وگرنه ثابت.
+                    val seconds = if (maxDelay > minDelay) (minDelay..maxDelay).random() else minDelay
+                    delay(seconds * 1000L)
                 }
             }
 
@@ -136,11 +140,15 @@ class SmsWorker(
         }
     }
 
-    /** ساختِ متنِ پیام بر اساس تنظیمات (شخصی‌سازی با نام یا متنِ یکسان). */
+    /**
+     * ساختِ متنِ پیام: اگر چند متنِ چرخشی تعریف شده باشد یکی تصادفی انتخاب می‌شود،
+     * سپس در صورتِ روشن‌بودنِ شخصی‌سازی، {نام} با نامِ مخاطب جایگزین می‌گردد.
+     */
     private fun buildMessage(settings: AppSettings, customer: Customer): String {
-        if (!settings.personalizeWithName) return settings.messageText
+        val base = MessageTemplates.pick(settings.messageText)
+        if (!settings.personalizeWithName) return base
         val name = cleanName(customer.name)
-        return settings.messageText.replace("{نام}", name)
+        return base.replace("{نام}", name)
     }
 
     /** حذفِ «دکتر»ِ ابتداییِ نام تا هنگام شخصی‌سازی تکراری نشود. */

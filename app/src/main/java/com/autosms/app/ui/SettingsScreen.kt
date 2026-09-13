@@ -66,16 +66,28 @@ fun SettingsScreen(
     val history by viewModel.history.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val contactQuery by viewModel.contactQuery.collectAsStateWithLifecycle()
+    val contactResults by viewModel.contactResults.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
     var testNumber by rememberSaveable { mutableStateOf("") }
     var showResetDialog by remember { mutableStateOf(false) }
     var showRunDialog by remember { mutableStateOf(false) }
+    var newContactName by rememberSaveable { mutableStateOf("") }
+    var newContactPhone by rememberSaveable { mutableStateOf("") }
 
     val context = LocalContext.current
     val receiveSmsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { }
+
+    // انتخابِ فایل برای ذخیره/خواندنِ پشتیبان
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> uri?.let { viewModel.exportBackup(it) } }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let { viewModel.importBackup(it) } }
 
     LaunchedEffect(message) {
         message?.let {
@@ -203,6 +215,86 @@ fun SettingsScreen(
                     }
                 }
 
+                // مدیریتِ مخاطبین
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("مدیریتِ مخاطبین", style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "افزودنِ دستیِ مخاطب یا حذفِ مخاطب. اگر شماره‌ای که وارد می‌کنی از قبل باشد، فقط نامش به‌روز می‌شود.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = newContactName,
+                            onValueChange = { newContactName = it },
+                            label = { Text("نام") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = newContactPhone,
+                            onValueChange = { newContactPhone = it },
+                            label = { Text("شماره") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.addOrUpdateContact(newContactName, newContactPhone)
+                                newContactName = ""
+                                newContactPhone = ""
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("افزودن / ذخیرهٔ مخاطب")
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+                        Divider()
+                        Spacer(Modifier.height(12.dp))
+
+                        OutlinedTextField(
+                            value = contactQuery,
+                            onValueChange = { viewModel.setContactQuery(it) },
+                            label = { Text("جست‌وجوی مخاطب (نام یا شماره)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        if (contactResults.isEmpty()) {
+                            Text("مخاطبی برای نمایش نیست.", style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            Text(
+                                "نمایشِ ${contactResults.size} مخاطب:",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            contactResults.forEach { customer ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        "• ${customer.name} — ${customer.phoneNumber}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    TextButton(
+                                        onClick = { viewModel.deleteContact(customer.phoneNumber) }
+                                    ) {
+                                        Text("حذف", color = Color(0xFFB00020))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // فعال/غیرفعال
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
@@ -305,6 +397,12 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3
                 )
+                Text(
+                    "می‌توانی چند متنِ متفاوت بنویسی و بینشان یک خط با «---» بگذاری؛ هنگامِ هر ارسال " +
+                        "یکی به‌صورتِ تصادفی انتخاب می‌شود. مثال:\n" +
+                        "سلام دکتر {نام}، جلسهٔ بازآموزی...\n---\nدرود دکتر {نام}، برنامهٔ این هفته...",
+                    style = MaterialTheme.typography.bodySmall
+                )
 
                 // فیلتر پیش‌شماره
                 OutlinedTextField(
@@ -359,6 +457,18 @@ fun SettingsScreen(
                     onValueChange = { v -> viewModel.updateSettings { it.copy(delaySeconds = v) } }
                 )
 
+                NumberField(
+                    label = "حداکثرِ فاصله (ثانیه) — ۰ یعنی ثابت",
+                    value = settings.delayMaxSeconds,
+                    onValueChange = { v -> viewModel.updateSettings { it.copy(delayMaxSeconds = v) } }
+                )
+                Text(
+                    "اگر این عدد از «فاصله بین پیام‌ها» بزرگ‌تر باشد، فاصلهٔ هر ارسال به‌صورتِ " +
+                        "تصادفی بینِ این دو انتخاب می‌شود (مثلاً ۶۰ تا ۹۰). این‌طور ارسال طبیعی‌تر " +
+                        "به نظر می‌رسد و کمتر شبیهِ اسپم می‌شود.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+
                 Button(
                     onClick = { viewModel.save() },
                     modifier = Modifier.fillMaxWidth()
@@ -395,6 +505,37 @@ fun SettingsScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB00020))
                 ) {
                     Text("توقفِ ارسال")
+                }
+
+                Divider()
+
+                // پشتیبان‌گیری و بازیابی
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("پشتیبان‌گیری و بازیابی", style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "همهٔ مخاطبین، تنظیمات، تاریخچه و لیستِ لغو در یک فایل ذخیره می‌شود. " +
+                                "اگر گوشی عوض یا برنامه پاک شد، از همین فایل بازیابی کن.\n" +
+                                "توجه: «بازیابی» داده‌های فعلی را با محتوای فایل جایگزین می‌کند.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = { exportLauncher.launch("auto_sms_backup.json") },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("ذخیرهٔ پشتیبان")
+                            }
+                            OutlinedButton(
+                                onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("بازیابی")
+                            }
+                        }
+                    }
                 }
 
                 Spacer(Modifier.height(24.dp))
