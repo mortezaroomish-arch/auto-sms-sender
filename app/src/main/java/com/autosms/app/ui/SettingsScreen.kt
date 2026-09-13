@@ -528,7 +528,7 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("📞 فقط این پیش‌شماره‌ها", style = MaterialTheme.typography.titleMedium)
+                            Text("📞 پیش‌شماره‌های ارسالِ پیامک", style = MaterialTheme.typography.titleMedium)
                             Switch(
                                 checked = settings.prefixFilterEnabled,
                                 onCheckedChange = { checked ->
