@@ -80,6 +80,8 @@ fun SettingsScreen(
     var showRunDialog by remember { mutableStateOf(false) }
     var historyExpanded by rememberSaveable { mutableStateOf(false) }
     var numbersExpanded by rememberSaveable { mutableStateOf(false) }
+    var autoReplyExpanded by rememberSaveable { mutableStateOf(false) }
+    var missedCallExpanded by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
     val receiveSmsLauncher = rememberLauncherForActivityResult(
@@ -378,7 +380,10 @@ fun SettingsScreen(
                                 }
                             )
                         }
-                        Spacer(Modifier.height(4.dp))
+                        TextButton(onClick = { autoReplyExpanded = !autoReplyExpanded }) {
+                            Text(if (autoReplyExpanded) "بستن ▲" else "تنظیمات ▼")
+                        }
+                        if (autoReplyExpanded) {
                         Text(
                             "وقتی کسی پیامک بدهد، خودکار جواب داده می‌شود.",
                             style = MaterialTheme.typography.bodySmall
@@ -406,6 +411,7 @@ fun SettingsScreen(
                             "هر خط: «کلیدواژه = جواب». فقط به موبایلِ واقعی و یک بار برای هر پیام.",
                             style = MaterialTheme.typography.bodySmall
                         )
+                        }
                     }
                 }
 
@@ -437,7 +443,10 @@ fun SettingsScreen(
                                 }
                             )
                         }
-                        Spacer(Modifier.height(4.dp))
+                        TextButton(onClick = { missedCallExpanded = !missedCallExpanded }) {
+                            Text(if (missedCallExpanded) "بستن ▲" else "تنظیمات ▼")
+                        }
+                        if (missedCallExpanded) {
                         Text(
                             "برای تماسِ بی‌پاسخ، این متن خودکار فرستاده می‌شود.",
                             style = MaterialTheme.typography.bodySmall
@@ -451,6 +460,7 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                             minLines = 2
                         )
+                        }
                     }
                 }
 
@@ -508,26 +518,66 @@ fun SettingsScreen(
                     }
                 }
 
-                // فیلتر پیش‌شماره
-                OutlinedTextField(
-                    value = settings.numberPrefixes,
-                    onValueChange = { text -> viewModel.updateSettings { it.copy(numberPrefixes = text) } },
-                    label = { Text("فقط این پیش‌شماره‌ها (خالی = همه)") },
-                    placeholder = { Text("مثال: 0912,0919") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // فیلترِ پیش‌شماره (با کلیدِ روشن/خاموش)
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("📞 فقط این پیش‌شماره‌ها", style = MaterialTheme.typography.titleMedium)
+                            Switch(
+                                checked = settings.prefixFilterEnabled,
+                                onCheckedChange = { checked ->
+                                    viewModel.updateSettings { it.copy(prefixFilterEnabled = checked) }
+                                }
+                            )
+                        }
+                        if (settings.prefixFilterEnabled) {
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = settings.numberPrefixes,
+                                onValueChange = { text -> viewModel.updateSettings { it.copy(numberPrefixes = text) } },
+                                label = { Text("پیش‌شماره‌ها") },
+                                placeholder = { Text("0912,0919") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
 
-                // لیست استثنا
-                OutlinedTextField(
-                    value = settings.excludedNumbers,
-                    onValueChange = { text -> viewModel.updateSettings { it.copy(excludedNumbers = text) } },
-                    label = { Text("شماره‌هایی که پیام نگیرند (هر شماره یک خط)") },
-                    placeholder = { Text("مثال:\n09120000000\n09350000000") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 2
-                )
+                // فیلترِ شماره‌های استثنا (با کلیدِ روشن/خاموش)
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("🚷 شماره‌هایی که پیام نگیرند", style = MaterialTheme.typography.titleMedium)
+                            Switch(
+                                checked = settings.excludedFilterEnabled,
+                                onCheckedChange = { checked ->
+                                    viewModel.updateSettings { it.copy(excludedFilterEnabled = checked) }
+                                }
+                            )
+                        }
+                        if (settings.excludedFilterEnabled) {
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = settings.excludedNumbers,
+                                onValueChange = { text -> viewModel.updateSettings { it.copy(excludedNumbers = text) } },
+                                label = { Text("هر شماره یک خط") },
+                                placeholder = { Text("09120000000\n09350000000") },
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 2
+                            )
+                        }
+                    }
+                }
 
                 // زمان‌بندی و تعداد — پیش‌فرض بسته تا موقعِ اسکرول اسلایدرها تغییر نکنند
                 Card(modifier = Modifier.fillMaxWidth()) {

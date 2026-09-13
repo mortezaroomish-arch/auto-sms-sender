@@ -37,6 +37,10 @@ data class AppSettings(
     val numberPrefixes: String = "",
     /** شماره‌هایی که هرگز نباید پیام بگیرند (هر شماره در یک خط یا با کاما). */
     val excludedNumbers: String = "",
+    /** آیا فیلترِ پیش‌شماره فعال است؟ اگر خاموش باشد، پیش‌شماره‌ها نادیده گرفته می‌شوند. */
+    val prefixFilterEnabled: Boolean = true,
+    /** آیا لیستِ استثنا فعال است؟ اگر خاموش باشد، لیستِ استثنا نادیده گرفته می‌شود. */
+    val excludedFilterEnabled: Boolean = true,
     /** لغوِ اشتراکِ خودکار: اگر روشن باشد، هرکس در جواب «لغو» بفرستد حذف می‌شود. */
     val autoOptOut: Boolean = false,
     /** کلمه‌ای که در پیامِ ورودی نشانهٔ لغو است. */
@@ -73,6 +77,8 @@ class SettingsRepository(private val context: Context) {
         val CYCLE_MESSAGE_INDEX = intPreferencesKey("cycle_message_index")
         val PREFIXES = stringPreferencesKey("number_prefixes")
         val EXCLUDED = stringPreferencesKey("excluded_numbers")
+        val PREFIX_ENABLED = booleanPreferencesKey("prefix_filter_enabled")
+        val EXCLUDED_ENABLED = booleanPreferencesKey("excluded_filter_enabled")
         val AUTO_OPT_OUT = booleanPreferencesKey("auto_opt_out")
         val OPT_OUT_KEYWORD = stringPreferencesKey("opt_out_keyword")
         val AUTO_REPLY_ENABLED = booleanPreferencesKey("auto_reply_enabled")
@@ -99,6 +105,8 @@ class SettingsRepository(private val context: Context) {
             sequentialMessages = p[Keys.SEQUENTIAL_MESSAGES] ?: false,
             numberPrefixes = p[Keys.PREFIXES] ?: "",
             excludedNumbers = p[Keys.EXCLUDED] ?: "",
+            prefixFilterEnabled = p[Keys.PREFIX_ENABLED] ?: true,
+            excludedFilterEnabled = p[Keys.EXCLUDED_ENABLED] ?: true,
             autoOptOut = p[Keys.AUTO_OPT_OUT] ?: false,
             optOutKeyword = p[Keys.OPT_OUT_KEYWORD] ?: "لغو",
             autoReplyEnabled = p[Keys.AUTO_REPLY_ENABLED] ?: false,
@@ -124,6 +132,8 @@ class SettingsRepository(private val context: Context) {
             p[Keys.SEQUENTIAL_MESSAGES] = settings.sequentialMessages
             p[Keys.PREFIXES] = settings.numberPrefixes
             p[Keys.EXCLUDED] = settings.excludedNumbers
+            p[Keys.PREFIX_ENABLED] = settings.prefixFilterEnabled
+            p[Keys.EXCLUDED_ENABLED] = settings.excludedFilterEnabled
             p[Keys.AUTO_OPT_OUT] = settings.autoOptOut
             p[Keys.OPT_OUT_KEYWORD] = settings.optOutKeyword
             p[Keys.AUTO_REPLY_ENABLED] = settings.autoReplyEnabled
