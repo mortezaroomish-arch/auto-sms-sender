@@ -15,6 +15,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -133,7 +135,15 @@ fun SettingsScreen(
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Scaffold(
-            topBar = { TopAppBar(title = { Text("پیامک خودکار") }) },
+            topBar = {
+                TopAppBar(
+                    title = { Text("📱 پیامک خودکار") },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                )
+            },
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { padding ->
             Column(
@@ -159,22 +169,61 @@ fun SettingsScreen(
                     }
                 }
 
-                // وضعیت و آمار
+                // بنرِ وضعیت (رنگش بسته به فعال/خاموش بودن تغییر می‌کند)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (settings.enabled) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        },
+                        contentColor = if (settings.enabled) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(
+                            if (settings.enabled) "✅ ارسالِ خودکار فعال است" else "⏸️ ارسالِ خودکار خاموش است",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text("⏰ اجرای بعدی: $nextRun", style = MaterialTheme.typography.bodyMedium)
+                        Text("📨 ارسالِ امروز: ${stats.sentToday}", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+
+                // آمار
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("وضعیت و آمار", style = MaterialTheme.typography.titleMedium)
+                        Text("📊 آمار", style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            StatItem(label = "امروز", value = stats.sentToday)
+                            StatItem(label = "این ماه", value = stats.sentThisMonth)
+                            StatItem(label = "کل", value = stats.totalSentEver)
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Divider()
                         Spacer(Modifier.height(8.dp))
-                        Text("مجموع مخاطبین ذخیره‌شده: ${stats.totalCustomers}")
-                        Text("هنوز پیام نگرفته‌اند: ${stats.neverSent}")
-                        Text("ارسال‌های امروز: ${stats.sentToday}")
-                        Text("ارسال در این ماه: ${stats.sentThisMonth}")
-                        Text("کلِ ارسال‌شده‌ها تا حالا: ${stats.totalSentEver}")
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedButton(onClick = { viewModel.syncContacts() }, enabled = !busy) {
+                        Text("👥 مجموع مخاطبین: ${stats.totalCustomers}", style = MaterialTheme.typography.bodyMedium)
+                        Text("🆕 هنوز پیام نگرفته‌اند: ${stats.neverSent}", style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = { viewModel.syncContacts() },
+                            enabled = !busy,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             if (busy) {
                                 CircularProgressIndicator(modifier = Modifier.height(18.dp))
                             } else {
-                                Text("همگام‌سازی مخاطبین گوشی")
+                                Text("🔄 همگام‌سازی مخاطبین گوشی")
                             }
                         }
                     }
@@ -188,7 +237,7 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("تاریخچه‌ی ارسال", style = MaterialTheme.typography.titleMedium)
+                            Text("📜 تاریخچه‌ی ارسال", style = MaterialTheme.typography.titleMedium)
                             if (history.isNotEmpty()) {
                                 TextButton(onClick = { historyExpanded = !historyExpanded }) {
                                     Text(if (historyExpanded) "بستن ▲" else "نمایش ▼")
@@ -240,7 +289,7 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("ارسال خودکار روزانه", style = MaterialTheme.typography.titleMedium)
+                            Text("🌙 ارسال خودکار روزانه", style = MaterialTheme.typography.titleMedium)
                             Switch(
                                 checked = settings.enabled,
                                 onCheckedChange = { checked ->
@@ -264,7 +313,7 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("شخصی‌سازی با نام", style = MaterialTheme.typography.titleMedium)
+                            Text("👤 شخصی‌سازی با نام", style = MaterialTheme.typography.titleMedium)
                             Switch(
                                 checked = settings.personalizeWithName,
                                 onCheckedChange = { checked ->
@@ -289,7 +338,7 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("لغوِ اشتراکِ خودکار", style = MaterialTheme.typography.titleMedium)
+                            Text("🚫 لغوِ اشتراکِ خودکار", style = MaterialTheme.typography.titleMedium)
                             Switch(
                                 checked = settings.autoOptOut,
                                 onCheckedChange = { checked ->
@@ -349,7 +398,7 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("تغییرِ متن در هر دوره", style = MaterialTheme.typography.titleMedium)
+                            Text("✍️ تغییرِ متن در هر دوره", style = MaterialTheme.typography.titleMedium)
                             Switch(
                                 checked = settings.sequentialMessages,
                                 onCheckedChange = { checked ->
@@ -396,7 +445,7 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("زمان‌بندی و تعداد", style = MaterialTheme.typography.titleMedium)
+                            Text("⏰ زمان‌بندی و تعداد", style = MaterialTheme.typography.titleMedium)
                             TextButton(onClick = { numbersExpanded = !numbersExpanded }) {
                                 Text(if (numbersExpanded) "بستن ▲" else "تغییر ▼")
                             }
@@ -466,13 +515,13 @@ fun SettingsScreen(
                     onClick = { viewModel.save() },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("ذخیرهٔ تنظیمات")
+                    Text("💾 ذخیرهٔ تنظیمات")
                 }
 
                 Divider()
 
                 // تست و اجرای دستی
-                Text("آزمایش و اجرا", style = MaterialTheme.typography.titleMedium)
+                Text("🧪 آزمایش و اجرا", style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(
                     value = testNumber,
                     onValueChange = { testNumber = it },
@@ -484,20 +533,20 @@ fun SettingsScreen(
                     onClick = { viewModel.sendTest(testNumber) },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("ارسال پیامک آزمایشی")
+                    Text("✉️ ارسال پیامک آزمایشی")
                 }
                 OutlinedButton(
                     onClick = { showRunDialog = true },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("اجرای دستی یک دور (الان)")
+                    Text("▶️ اجرای دستی یک دور (الان)")
                 }
                 Button(
                     onClick = { viewModel.stopSending() },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB00020))
                 ) {
-                    Text("توقفِ ارسال")
+                    Text("🛑 توقفِ ارسال")
                 }
 
                 Divider()
@@ -505,7 +554,7 @@ fun SettingsScreen(
                 // پشتیبان‌گیری و بازیابی
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("پشتیبان‌گیری و بازیابی", style = MaterialTheme.typography.titleMedium)
+                        Text("💾 پشتیبان‌گیری و بازیابی", style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(8.dp))
                         Text(
                             "همهٔ مخاطبین، تنظیمات، تاریخچه و لیستِ لغو در یک فایل ذخیره می‌شود. " +
@@ -534,6 +583,19 @@ fun SettingsScreen(
                 Spacer(Modifier.height(24.dp))
             }
         }
+    }
+}
+
+/** یک عددِ آماری با نمایشِ درشت و برچسبِ زیرش. */
+@Composable
+private fun StatItem(label: String, value: Int) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            value.toString(),
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(label, style = MaterialTheme.typography.labelMedium)
     }
 }
 
