@@ -17,6 +17,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -139,8 +140,13 @@ fun SettingsScreen(
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("📱 پیامک خودکار") },
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            "📱 پیامک خودکار",
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                    },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         titleContentColor = MaterialTheme.colorScheme.onPrimary
