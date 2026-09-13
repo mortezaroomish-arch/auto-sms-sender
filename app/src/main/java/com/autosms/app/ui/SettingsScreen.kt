@@ -75,6 +75,7 @@ fun SettingsScreen(
     var showResetDialog by remember { mutableStateOf(false) }
     var showRunDialog by remember { mutableStateOf(false) }
     var historyExpanded by rememberSaveable { mutableStateOf(false) }
+    var numbersExpanded by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
     val receiveSmsLauncher = rememberLauncherForActivityResult(
@@ -387,51 +388,79 @@ fun SettingsScreen(
                     minLines = 2
                 )
 
-                // تعداد روزانه
-                SliderField(
-                    label = "تعداد ارسال در هر روز",
-                    value = settings.dailyCount,
-                    min = 1,
-                    max = 500,
-                    onValueChange = { v -> viewModel.updateSettings { it.copy(dailyCount = v) } }
-                )
-
-                SliderField(
-                    label = "ساعت شروع",
-                    value = settings.startHour,
-                    min = 0,
-                    max = 23,
-                    onValueChange = { v -> viewModel.updateSettings { it.copy(startHour = v) } }
-                )
-                SliderField(
-                    label = "ساعت پایان",
-                    value = settings.endHour,
-                    min = 0,
-                    max = 23,
-                    onValueChange = { v -> viewModel.updateSettings { it.copy(endHour = v) } }
-                )
-
-                SliderField(
-                    label = "فاصله بین پیام‌ها (ثانیه)",
-                    value = settings.delaySeconds,
-                    min = 5,
-                    max = 300,
-                    onValueChange = { v -> viewModel.updateSettings { it.copy(delaySeconds = v) } }
-                )
-
-                SliderField(
-                    label = "حداکثرِ فاصله (ثانیه) — ۰ یعنی ثابت",
-                    value = settings.delayMaxSeconds,
-                    min = 0,
-                    max = 300,
-                    onValueChange = { v -> viewModel.updateSettings { it.copy(delayMaxSeconds = v) } }
-                )
-                Text(
-                    "اگر این عدد از «فاصله بین پیام‌ها» بزرگ‌تر باشد، فاصلهٔ هر ارسال به‌صورتِ " +
-                        "تصادفی بینِ این دو انتخاب می‌شود (مثلاً ۶۰ تا ۹۰). این‌طور ارسال طبیعی‌تر " +
-                        "به نظر می‌رسد و کمتر شبیهِ اسپم می‌شود.",
-                    style = MaterialTheme.typography.bodySmall
-                )
+                // زمان‌بندی و تعداد — پیش‌فرض بسته تا موقعِ اسکرول اسلایدرها تغییر نکنند
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("زمان‌بندی و تعداد", style = MaterialTheme.typography.titleMedium)
+                            TextButton(onClick = { numbersExpanded = !numbersExpanded }) {
+                                Text(if (numbersExpanded) "بستن ▲" else "تغییر ▼")
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        if (!numbersExpanded) {
+                            val delayText = if (settings.delayMaxSeconds > settings.delaySeconds) {
+                                "${settings.delaySeconds} تا ${settings.delayMaxSeconds}"
+                            } else {
+                                "${settings.delaySeconds}"
+                            }
+                            Text(
+                                "تعداد: ${settings.dailyCount}  •  ساعت: ${settings.startHour} تا ${settings.endHour}  •  فاصله: $delayText ثانیه",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                "برای تغییر، «تغییر» را بزن.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        } else {
+                            SliderField(
+                                label = "تعداد ارسال در هر روز",
+                                value = settings.dailyCount,
+                                min = 1,
+                                max = 500,
+                                onValueChange = { v -> viewModel.updateSettings { it.copy(dailyCount = v) } }
+                            )
+                            SliderField(
+                                label = "ساعت شروع",
+                                value = settings.startHour,
+                                min = 0,
+                                max = 23,
+                                onValueChange = { v -> viewModel.updateSettings { it.copy(startHour = v) } }
+                            )
+                            SliderField(
+                                label = "ساعت پایان",
+                                value = settings.endHour,
+                                min = 0,
+                                max = 23,
+                                onValueChange = { v -> viewModel.updateSettings { it.copy(endHour = v) } }
+                            )
+                            SliderField(
+                                label = "فاصله بین پیام‌ها (ثانیه)",
+                                value = settings.delaySeconds,
+                                min = 5,
+                                max = 300,
+                                onValueChange = { v -> viewModel.updateSettings { it.copy(delaySeconds = v) } }
+                            )
+                            SliderField(
+                                label = "حداکثرِ فاصله (ثانیه) — ۰ یعنی ثابت",
+                                value = settings.delayMaxSeconds,
+                                min = 0,
+                                max = 300,
+                                onValueChange = { v -> viewModel.updateSettings { it.copy(delayMaxSeconds = v) } }
+                            )
+                            Text(
+                                "اگر این عدد از «فاصله بین پیام‌ها» بزرگ‌تر باشد، فاصلهٔ هر ارسال به‌صورتِ " +
+                                    "تصادفی بینِ این دو انتخاب می‌شود (مثلاً ۶۰ تا ۹۰). این‌طور ارسال طبیعی‌تر " +
+                                    "به نظر می‌رسد و کمتر شبیهِ اسپم می‌شود.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
 
                 Button(
                     onClick = { viewModel.save() },
