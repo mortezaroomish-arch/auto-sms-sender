@@ -37,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -332,8 +333,7 @@ fun SettingsScreen(
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "اگر روشن باشد، هر جای متن که {نام} بنویسی با نام مخاطب جایگزین می‌شود. " +
-                                "مثال: «سلام دکتر {نام} عزیز». اگر خاموش باشد، متن یکسان به همه ارسال می‌شود.",
+                            "«{نام}» در متن با نامِ مخاطب جایگزین می‌شود.",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -361,17 +361,12 @@ fun SettingsScreen(
                                 }
                             )
                         }
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "اگر روشن باشد، هرکس در جواب این کلمه را بفرستد، خودکار از لیست حذف می‌شود " +
-                                "و دیگر پیام نمی‌گیرد. (نیاز به مجوزِ «دریافت پیامک» دارد.)",
-                            style = MaterialTheme.typography.bodySmall
-                        )
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(
                             value = settings.optOutKeyword,
                             onValueChange = { text -> viewModel.updateSettings { it.copy(optOutKeyword = text) } },
                             label = { Text("کلمه‌ی لغو") },
+                            placeholder = { Text("لغو") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -408,9 +403,7 @@ fun SettingsScreen(
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "اگر روشن باشد، وقتی کسی برایت پیامک بفرستد برنامه خودکار جواب می‌دهد. " +
-                                "اول قانون‌های کلیدواژه‌ای بررسی می‌شوند؛ اگر هیچ‌کدام در متنِ پیام نبود، " +
-                                "«جوابِ پیش‌فرض» فرستاده می‌شود. (نیاز به مجوزِ «دریافت پیامک» دارد.)",
+                            "وقتی کسی پیامک بدهد، خودکار جواب داده می‌شود.",
                             style = MaterialTheme.typography.bodySmall
                         )
                         Spacer(Modifier.height(8.dp))
@@ -433,16 +426,7 @@ fun SettingsScreen(
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "قالبِ هر خط: «کلیدواژه = جواب». اگر کلیدواژه در متنِ پیامِ دریافتی باشد، همان جواب " +
-                                "فرستاده می‌شود. مثال: اگر کسی بنویسد «قیمت چند؟»، چون کلمهٔ «قیمت» در آن هست، " +
-                                "جوابِ مربوط به «قیمت» می‌رود.\n" +
-                                "✍️ کلیدواژه‌ها منعطف‌اند: «آدرس» و «ادرس»، یا «ی» و «ي» یکی حساب می‌شوند.\n" +
-                                "✅ برای هر پیامکِ دریافتی فقط یک جواب فرستاده می‌شود (نه بیشتر).\n" +
-                                "🧪 برای تستِ پاسخِ خودکار، از یک گوشیِ دیگر به این گوشی پیامک بده " +
-                                "(نه به شماره‌ی خودت، چون باعثِ حلقه می‌شود).\n" +
-                                "نکته: فقط به شماره‌های موبایلِ واقعی جواب داده می‌شود (نه اپراتور/بانک/کدهای خدماتی).\n" +
-                                "نکته: تغییرات پس از زدنِ دکمهٔ «💾 ذخیرهٔ تنظیمات» اعمال می‌شوند.\n" +
-                                "توجه: هر پاسخِ خودکار یک پیامکِ واقعی از سیم‌کارتِ توست و هزینه دارد.",
+                            "هر خط: «کلیدواژه = جواب». فقط به موبایلِ واقعی و یک بار برای هر پیام.",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -478,8 +462,7 @@ fun SettingsScreen(
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "اگر روشن باشد، وقتی کسی زنگ بزند و جواب ندهی (تماسِ بی‌پاسخ)، این پیام خودکار " +
-                                "برایش فرستاده می‌شود. (نیاز به مجوزِ تلفن و گزارشِ تماس‌ها دارد.)",
+                            "برای تماسِ بی‌پاسخ، این متن خودکار فرستاده می‌شود.",
                             style = MaterialTheme.typography.bodySmall
                         )
                         Spacer(Modifier.height(8.dp))
@@ -487,32 +470,17 @@ fun SettingsScreen(
                             value = settings.missedCallReplyText,
                             onValueChange = { text -> viewModel.updateSettings { it.copy(missedCallReplyText = text) } },
                             label = { Text("متنِ تماسِ بی‌پاسخ") },
+                            placeholder = { Text("در اسرع وقت با شما تماس می‌گیرم") },
                             modifier = Modifier.fillMaxWidth(),
                             minLines = 2
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "فقط برای تماسِ بی‌پاسخ فرستاده می‌شود (نه تماسِ جواب‌داده‌شده یا خروجی). " +
-                                "برای هر شماره در چند دقیقه فقط یک بار، و فقط به شماره‌های موبایلِ واقعی.\n" +
-                                "نکته: تغییرات پس از زدنِ دکمهٔ «💾 ذخیرهٔ تنظیمات» اعمال می‌شوند.",
-                            style = MaterialTheme.typography.bodySmall
                         )
                     }
                 }
 
-                // متن پیامک
-                OutlinedTextField(
-                    value = settings.messageText,
-                    onValueChange = { text -> viewModel.updateSettings { it.copy(messageText = text) } },
-                    label = { Text("متن پیامک") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3
-                )
-                Text(
-                    "می‌توانی چند متنِ آماده بنویسی و بینشان یک خط با «---» بگذاری. اولین متن، " +
-                        "«متنِ پیش‌فرض» است. مثال:\n" +
-                        "سلام دکتر {نام}، جلسهٔ بازآموزی...\n---\nدرود دکتر {نام}، برنامهٔ این هفته...",
-                    style = MaterialTheme.typography.bodySmall
+                // متن‌های پیامک (هر متن یک کادرِ جدا، با دکمهٔ افزودن)
+                MessageListEditor(
+                    messageText = settings.messageText,
+                    onChange = { joined -> viewModel.updateSettings { it.copy(messageText = joined) } }
                 )
 
                 // جلوگیری از تکرارِ متن در دوره‌ی بعد
@@ -533,9 +501,7 @@ fun SettingsScreen(
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "روشن: بعد از اینکه یک دوره‌ی کامل تمام شد و از اول شروع می‌کند، متن عوض می‌شود " +
-                                "و متنِ بعدیِ ذخیره‌شده می‌رود (پس یک نفر دو دوره‌ی پشتِ‌سرِهم متنِ تکراری نمی‌گیرد).\n" +
-                                "خاموش: همیشه متنِ پیش‌فرض (اولین متن) فرستاده می‌شود.",
+                            "روشن: هر دوره یک متنِ متفاوت. خاموش: همیشه متنِ اول.",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -627,9 +593,7 @@ fun SettingsScreen(
                                 onValueChange = { v -> viewModel.updateSettings { it.copy(delayMaxSeconds = v) } }
                             )
                             Text(
-                                "اگر این عدد از «فاصله بین پیام‌ها» بزرگ‌تر باشد، فاصلهٔ هر ارسال به‌صورتِ " +
-                                    "تصادفی بینِ این دو انتخاب می‌شود (مثلاً ۶۰ تا ۹۰). این‌طور ارسال طبیعی‌تر " +
-                                    "به نظر می‌رسد و کمتر شبیهِ اسپم می‌شود.",
+                                "اگر بزرگ‌تر از «فاصله» باشد، فاصلهٔ ارسال تصادفی می‌شود (طبیعی‌تر).",
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
@@ -682,9 +646,7 @@ fun SettingsScreen(
                         Text("💾 پشتیبان‌گیری و بازیابی", style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "همهٔ مخاطبین، تنظیمات، تاریخچه و لیستِ لغو در یک فایل ذخیره می‌شود. " +
-                                "اگر گوشی عوض یا برنامه پاک شد، از همین فایل بازیابی کن.\n" +
-                                "توجه: «بازیابی» داده‌های فعلی را با محتوای فایل جایگزین می‌کند.",
+                            "همه‌چیز در یک فایل ذخیره/بازیابی می‌شود. «بازیابی» جایگزینِ داده‌های فعلی می‌شود.",
                             style = MaterialTheme.typography.bodySmall
                         )
                         Spacer(Modifier.height(8.dp))
@@ -706,6 +668,79 @@ fun SettingsScreen(
                 }
 
                 Spacer(Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+/**
+ * ویرایشگرِ چند متنِ پیامک: هر متن یک کادرِ جدا + دکمهٔ «افزودن متن» + حذفِ هر متن.
+ * متن‌ها داخلاً با جداکنندهٔ «---» در یک رشته ذخیره می‌شوند تا با بقیهٔ برنامه سازگار بماند.
+ */
+@Composable
+private fun MessageListEditor(
+    messageText: String,
+    onChange: (String) -> Unit
+) {
+    val separator = "\n---\n"
+    val messages = remember { mutableStateListOf<String>() }
+    // هم‌گام‌سازی با منبع: هنگام بارگذاری یا تغییرِ بیرونی، لیست را از رشته بساز.
+    LaunchedEffect(messageText) {
+        val joined = messages.joinToString(separator)
+        if (messageText != joined) {
+            val parsed = if (messageText.isEmpty()) listOf("") else messageText.split(separator)
+            messages.clear()
+            messages.addAll(parsed.ifEmpty { listOf("") })
+        } else if (messages.isEmpty()) {
+            messages.add("")
+        }
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text("✉️ متن‌های پیامک", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "برای هر متن یک کادر. با «افزودن متن» چند متن داشته باش.",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Spacer(Modifier.height(12.dp))
+            messages.forEachIndexed { index, msg ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("متن ${index + 1}", style = MaterialTheme.typography.titleSmall)
+                    if (messages.size > 1) {
+                        TextButton(onClick = {
+                            messages.removeAt(index)
+                            onChange(messages.joinToString(separator))
+                        }) {
+                            Text("حذف", color = Color(0xFFB00020))
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = msg,
+                    onValueChange = {
+                        messages[index] = it
+                        onChange(messages.joinToString(separator))
+                    },
+                    placeholder = { Text("سلام دکتر {نام}، ...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+            OutlinedButton(
+                onClick = {
+                    messages.add("")
+                    onChange(messages.joinToString(separator))
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("➕ افزودن متن")
             }
         }
     }
