@@ -241,7 +241,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         customers = dao.getAll(),
                         settings = settingsRepo.current(),
                         optedOut = settingsRepo.currentOptedOut(),
-                        cycleStart = settingsRepo.currentCycleStart()
+                        cycleStart = settingsRepo.currentCycleStart(),
+                        cycleMessageIndex = settingsRepo.currentCycleMessageIndex()
                     )
                 }
                 withContext(Dispatchers.IO) {
@@ -272,6 +273,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     settingsRepo.update(backup.settings)
                     settingsRepo.setOptedOut(backup.optedOut)
                     settingsRepo.setCycleStart(backup.cycleStart)
+                    settingsRepo.setCycleMessageIndex(backup.cycleMessageIndex)
                 }
                 _settings.value = settingsRepo.current()
                 searchContacts()

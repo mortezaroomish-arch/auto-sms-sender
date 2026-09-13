@@ -334,11 +334,36 @@ fun SettingsScreen(
                     minLines = 3
                 )
                 Text(
-                    "می‌توانی چند متنِ متفاوت بنویسی و بینشان یک خط با «---» بگذاری؛ هنگامِ هر ارسال " +
-                        "یکی به‌صورتِ تصادفی انتخاب می‌شود. مثال:\n" +
+                    "می‌توانی چند متنِ متفاوت بنویسی و بینشان یک خط با «---» بگذاری. مثال:\n" +
                         "سلام دکتر {نام}، جلسهٔ بازآموزی...\n---\nدرود دکتر {نام}، برنامهٔ این هفته...",
                     style = MaterialTheme.typography.bodySmall
                 )
+
+                // جلوگیری از تکرارِ متن در دوره‌ی بعد
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("جلوگیری از تکرارِ متن", style = MaterialTheme.typography.titleMedium)
+                            Switch(
+                                checked = settings.sequentialMessages,
+                                onCheckedChange = { checked ->
+                                    viewModel.updateSettings { it.copy(sequentialMessages = checked) }
+                                }
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "اگر روشن باشد و چند متن نوشته باشی، در هر دوره یک متن به‌ترتیب استفاده می‌شود " +
+                                "و دوره‌ی بعد متنِ بعدی؛ این‌طور یک نفر دو دوره‌ی پشتِ‌سرِهم متنِ تکراری نمی‌گیرد. " +
+                                "اگر خاموش باشد، در هر ارسال یک متن به‌صورتِ تصادفی انتخاب می‌شود.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
 
                 // فیلتر پیش‌شماره
                 OutlinedTextField(

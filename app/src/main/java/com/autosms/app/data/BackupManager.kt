@@ -15,7 +15,8 @@ object BackupManager {
         val customers: List<Customer>,
         val settings: AppSettings,
         val optedOut: Set<String>,
-        val cycleStart: Long
+        val cycleStart: Long,
+        val cycleMessageIndex: Int
     )
 
     /** ساختِ متنِ JSON از داده‌های فعلی. */
@@ -23,11 +24,13 @@ object BackupManager {
         customers: List<Customer>,
         settings: AppSettings,
         optedOut: Set<String>,
-        cycleStart: Long
+        cycleStart: Long,
+        cycleMessageIndex: Int
     ): String {
         val root = JSONObject()
         root.put("version", VERSION)
         root.put("cycleStart", cycleStart)
+        root.put("cycleMessageIndex", cycleMessageIndex)
 
         val s = JSONObject()
         s.put("enabled", settings.enabled)
@@ -38,6 +41,7 @@ object BackupManager {
         s.put("delaySeconds", settings.delaySeconds)
         s.put("delayMaxSeconds", settings.delayMaxSeconds)
         s.put("personalizeWithName", settings.personalizeWithName)
+        s.put("sequentialMessages", settings.sequentialMessages)
         s.put("numberPrefixes", settings.numberPrefixes)
         s.put("excludedNumbers", settings.excludedNumbers)
         s.put("autoOptOut", settings.autoOptOut)
@@ -76,6 +80,7 @@ object BackupManager {
             delaySeconds = s.optInt("delaySeconds", 70),
             delayMaxSeconds = s.optInt("delayMaxSeconds", 0),
             personalizeWithName = s.optBoolean("personalizeWithName", false),
+            sequentialMessages = s.optBoolean("sequentialMessages", false),
             numberPrefixes = s.optString("numberPrefixes", ""),
             excludedNumbers = s.optString("excludedNumbers", ""),
             autoOptOut = s.optBoolean("autoOptOut", false),
@@ -103,7 +108,8 @@ object BackupManager {
         for (i in 0 until oarr.length()) optedOut.add(oarr.getString(i))
 
         val cycleStart = root.optLong("cycleStart", 0L)
+        val cycleMessageIndex = root.optInt("cycleMessageIndex", 0)
 
-        return Backup(customers, settings, optedOut, cycleStart)
+        return Backup(customers, settings, optedOut, cycleStart, cycleMessageIndex)
     }
 }

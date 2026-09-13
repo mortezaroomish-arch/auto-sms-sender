@@ -27,6 +27,12 @@ data class AppSettings(
     val delayMaxSeconds: Int = 0,
     /** اگر روشن باشد، عبارت {نام} در متن با نام مخاطب جایگزین می‌شود. */
     val personalizeWithName: Boolean = false,
+    /**
+     * اگر روشن باشد و چند متن (جداشده با «---») داشته باشی، در هر دوره یک متن به‌ترتیب
+     * انتخاب می‌شود و دوره‌ی بعد متنِ بعدی؛ این‌طور یک نفر دو دوره‌ی پشتِ‌هم متنِ تکراری نمی‌گیرد.
+     * اگر خاموش باشد، در هر ارسال یک متن به‌صورتِ تصادفی انتخاب می‌شود.
+     */
+    val sequentialMessages: Boolean = false,
     /** فقط شماره‌هایی که با این پیش‌شماره‌ها شروع می‌شوند پیام می‌گیرند (با کاما جدا). خالی = همه. */
     val numberPrefixes: String = "",
     /** شماره‌هایی که هرگز نباید پیام بگیرند (هر شماره در یک خط یا با کاما). */
@@ -50,6 +56,8 @@ class SettingsRepository(private val context: Context) {
         val DELAY_SECONDS = intPreferencesKey("delay_seconds")
         val DELAY_MAX_SECONDS = intPreferencesKey("delay_max_seconds")
         val PERSONALIZE = booleanPreferencesKey("personalize_with_name")
+        val SEQUENTIAL_MESSAGES = booleanPreferencesKey("sequential_messages")
+        val CYCLE_MESSAGE_INDEX = intPreferencesKey("cycle_message_index")
         val PREFIXES = stringPreferencesKey("number_prefixes")
         val EXCLUDED = stringPreferencesKey("excluded_numbers")
         val AUTO_OPT_OUT = booleanPreferencesKey("auto_opt_out")
@@ -68,6 +76,7 @@ class SettingsRepository(private val context: Context) {
             delaySeconds = p[Keys.DELAY_SECONDS] ?: 70,
             delayMaxSeconds = p[Keys.DELAY_MAX_SECONDS] ?: 0,
             personalizeWithName = p[Keys.PERSONALIZE] ?: false,
+            sequentialMessages = p[Keys.SEQUENTIAL_MESSAGES] ?: false,
             numberPrefixes = p[Keys.PREFIXES] ?: "",
             excludedNumbers = p[Keys.EXCLUDED] ?: "",
             autoOptOut = p[Keys.AUTO_OPT_OUT] ?: false,
@@ -87,6 +96,7 @@ class SettingsRepository(private val context: Context) {
             p[Keys.DELAY_SECONDS] = settings.delaySeconds
             p[Keys.DELAY_MAX_SECONDS] = settings.delayMaxSeconds
             p[Keys.PERSONALIZE] = settings.personalizeWithName
+            p[Keys.SEQUENTIAL_MESSAGES] = settings.sequentialMessages
             p[Keys.PREFIXES] = settings.numberPrefixes
             p[Keys.EXCLUDED] = settings.excludedNumbers
             p[Keys.AUTO_OPT_OUT] = settings.autoOptOut
@@ -134,6 +144,16 @@ class SettingsRepository(private val context: Context) {
     suspend fun setCycleStart(timestamp: Long) {
         context.dataStore.edit { p ->
             p[Keys.CYCLE_START] = timestamp
+        }
+    }
+
+    /** شمارهٔ متنِ فعلی برای حالتِ «ترتیبی»؛ با هر چرخهٔ جدید یکی زیاد می‌شود. */
+    suspend fun currentCycleMessageIndex(): Int =
+        context.dataStore.data.map { it[Keys.CYCLE_MESSAGE_INDEX] ?: 0 }.first()
+
+    suspend fun setCycleMessageIndex(index: Int) {
+        context.dataStore.edit { p ->
+            p[Keys.CYCLE_MESSAGE_INDEX] = index
         }
     }
 }
