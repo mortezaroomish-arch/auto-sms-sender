@@ -21,7 +21,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
@@ -51,6 +53,7 @@ import androidx.core.content.ContextCompat
 import android.Manifest
 import android.content.pm.PackageManager
 import com.autosms.app.util.JalaliDate
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,16 +69,29 @@ fun SettingsScreen(
     val history by viewModel.history.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val contactQuery by viewModel.contactQuery.collectAsStateWithLifecycle()
+    val contactResults by viewModel.contactResults.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
     var testNumber by rememberSaveable { mutableStateOf("") }
     var showResetDialog by remember { mutableStateOf(false) }
     var showRunDialog by remember { mutableStateOf(false) }
+    var newContactName by rememberSaveable { mutableStateOf("") }
+    var newContactPhone by rememberSaveable { mutableStateOf("") }
+    var historyExpanded by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
     val receiveSmsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { }
+
+    // انتخابِ فایل برای ذخیره/خواندنِ پشتیبان
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> uri?.let { viewModel.exportBackup(it) } }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let { viewModel.importBackup(it) } }
 
     LaunchedEffect(message) {
         message?.let {
@@ -167,13 +183,29 @@ fun SettingsScreen(
                     }
                 }
 
-                // تاریخچه‌ی ارسال
+                // تاریخچه‌ی ارسال (به‌صورتِ پیش‌فرض بسته تا لازم نباشد اسکرول کنی)
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("تاریخچه‌ی ارسال", style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("تاریخچه‌ی ارسال", style = MaterialTheme.typography.titleMedium)
+                            if (history.isNotEmpty()) {
+                                TextButton(onClick = { historyExpanded = !historyExpanded }) {
+                                    Text(if (historyExpanded) "بستن ▲" else "نمایش ▼")
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
                         if (history.isEmpty()) {
                             Text("هنوز پیامی ارسال نشده است.")
+                        } else if (!historyExpanded) {
+                            Text(
+                                "${history.size} ارسالِ اخیر ذخیره شده. برای دیدن، «نمایش» را بزن.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
                         } else {
                             Text(
                                 "آخرین ${history.size} ارسال (جدیدترین اول):",
@@ -198,6 +230,86 @@ fun SettingsScreen(
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFB00020))
                             ) {
                                 Text("شروع دوره‌ی جدید")
+                            }
+                        }
+                    }
+                }
+
+                // مدیریتِ مخاطبین
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("مدیریتِ مخاطبین", style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "افزودنِ دستیِ مخاطب یا حذفِ مخاطب. اگر شماره‌ای که وارد می‌کنی از قبل باشد، فقط نامش به‌روز می‌شود.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = newContactName,
+                            onValueChange = { newContactName = it },
+                            label = { Text("نام") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = newContactPhone,
+                            onValueChange = { newContactPhone = it },
+                            label = { Text("شماره") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.addOrUpdateContact(newContactName, newContactPhone)
+                                newContactName = ""
+                                newContactPhone = ""
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("افزودن / ذخیرهٔ مخاطب")
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+                        Divider()
+                        Spacer(Modifier.height(12.dp))
+
+                        OutlinedTextField(
+                            value = contactQuery,
+                            onValueChange = { viewModel.setContactQuery(it) },
+                            label = { Text("جست‌وجوی مخاطب (نام یا شماره)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        if (contactResults.isEmpty()) {
+                            Text("مخاطبی برای نمایش نیست.", style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            Text(
+                                "نمایشِ ${contactResults.size} مخاطب:",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            contactResults.forEach { customer ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        "• ${customer.name} — ${customer.phoneNumber}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    TextButton(
+                                        onClick = { viewModel.deleteContact(customer.phoneNumber) }
+                                    ) {
+                                        Text("حذف", color = Color(0xFFB00020))
+                                    }
+                                }
                             }
                         }
                     }
@@ -305,6 +417,12 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3
                 )
+                Text(
+                    "می‌توانی چند متنِ متفاوت بنویسی و بینشان یک خط با «---» بگذاری؛ هنگامِ هر ارسال " +
+                        "یکی به‌صورتِ تصادفی انتخاب می‌شود. مثال:\n" +
+                        "سلام دکتر {نام}، جلسهٔ بازآموزی...\n---\nدرود دکتر {نام}، برنامهٔ این هفته...",
+                    style = MaterialTheme.typography.bodySmall
+                )
 
                 // فیلتر پیش‌شماره
                 OutlinedTextField(
@@ -328,35 +446,49 @@ fun SettingsScreen(
                 )
 
                 // تعداد روزانه
-                NumberField(
+                SliderField(
                     label = "تعداد ارسال در هر روز",
                     value = settings.dailyCount,
+                    min = 1,
+                    max = 500,
                     onValueChange = { v -> viewModel.updateSettings { it.copy(dailyCount = v) } }
                 )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    NumberField(
-                        label = "ساعت شروع (۰ تا ۲۳)",
-                        value = settings.startHour,
-                        onValueChange = { v ->
-                            viewModel.updateSettings { it.copy(startHour = v.coerceIn(0, 23)) }
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                    NumberField(
-                        label = "ساعت پایان (۰ تا ۲۳)",
-                        value = settings.endHour,
-                        onValueChange = { v ->
-                            viewModel.updateSettings { it.copy(endHour = v.coerceIn(0, 23)) }
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                SliderField(
+                    label = "ساعت شروع",
+                    value = settings.startHour,
+                    min = 0,
+                    max = 23,
+                    onValueChange = { v -> viewModel.updateSettings { it.copy(startHour = v) } }
+                )
+                SliderField(
+                    label = "ساعت پایان",
+                    value = settings.endHour,
+                    min = 0,
+                    max = 23,
+                    onValueChange = { v -> viewModel.updateSettings { it.copy(endHour = v) } }
+                )
 
-                NumberField(
+                SliderField(
                     label = "فاصله بین پیام‌ها (ثانیه)",
                     value = settings.delaySeconds,
+                    min = 5,
+                    max = 300,
                     onValueChange = { v -> viewModel.updateSettings { it.copy(delaySeconds = v) } }
+                )
+
+                SliderField(
+                    label = "حداکثرِ فاصله (ثانیه) — ۰ یعنی ثابت",
+                    value = settings.delayMaxSeconds,
+                    min = 0,
+                    max = 300,
+                    onValueChange = { v -> viewModel.updateSettings { it.copy(delayMaxSeconds = v) } }
+                )
+                Text(
+                    "اگر این عدد از «فاصله بین پیام‌ها» بزرگ‌تر باشد، فاصلهٔ هر ارسال به‌صورتِ " +
+                        "تصادفی بینِ این دو انتخاب می‌شود (مثلاً ۶۰ تا ۹۰). این‌طور ارسال طبیعی‌تر " +
+                        "به نظر می‌رسد و کمتر شبیهِ اسپم می‌شود.",
+                    style = MaterialTheme.typography.bodySmall
                 )
 
                 Button(
@@ -397,28 +529,80 @@ fun SettingsScreen(
                     Text("توقفِ ارسال")
                 }
 
+                Divider()
+
+                // پشتیبان‌گیری و بازیابی
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("پشتیبان‌گیری و بازیابی", style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "همهٔ مخاطبین، تنظیمات، تاریخچه و لیستِ لغو در یک فایل ذخیره می‌شود. " +
+                                "اگر گوشی عوض یا برنامه پاک شد، از همین فایل بازیابی کن.\n" +
+                                "توجه: «بازیابی» داده‌های فعلی را با محتوای فایل جایگزین می‌کند.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = { exportLauncher.launch("auto_sms_backup.json") },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("ذخیرهٔ پشتیبان")
+                            }
+                            OutlinedButton(
+                                onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("بازیابی")
+                            }
+                        }
+                    }
+                }
+
                 Spacer(Modifier.height(24.dp))
             }
         }
     }
 }
 
+/**
+ * انتخابِ عدد به‌صورتِ کشویی (اسلایدر) به‌جای تایپ. مقدار در بالا نمایش داده می‌شود
+ * و دکمه‌های − و + برای تنظیمِ دقیقِ یک‌واحدی هم کنارِ آن هست.
+ */
 @Composable
-private fun NumberField(
+private fun SliderField(
     label: String,
     value: Int,
+    min: Int,
+    max: Int,
     onValueChange: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    OutlinedTextField(
-        value = value.toString(),
-        onValueChange = { text ->
-            val n = text.filter { it.isDigit() }.toIntOrNull() ?: 0
-            onValueChange(n)
-        },
-        label = { Text(label) },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        singleLine = true,
-        modifier = modifier
-    )
+    val current = value.coerceIn(min, max)
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            IconButton(onClick = { onValueChange((current - 1).coerceIn(min, max)) }) {
+                Text("−", style = MaterialTheme.typography.titleLarge)
+            }
+            Text(
+                current.toString(),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+            IconButton(onClick = { onValueChange((current + 1).coerceIn(min, max)) }) {
+                Text("+", style = MaterialTheme.typography.titleLarge)
+            }
+        }
+        Slider(
+            value = current.toFloat(),
+            onValueChange = { onValueChange(it.roundToInt().coerceIn(min, max)) },
+            valueRange = min.toFloat()..max.toFloat()
+        )
+    }
 }

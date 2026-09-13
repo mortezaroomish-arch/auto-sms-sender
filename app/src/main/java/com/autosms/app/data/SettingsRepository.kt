@@ -21,7 +21,10 @@ data class AppSettings(
     val dailyCount: Int = 100,
     val startHour: Int = 20,
     val endHour: Int = 22,
+    /** حداقلِ فاصلهٔ بینِ دو پیام (ثانیه). */
     val delaySeconds: Int = 70,
+    /** حداکثرِ فاصله (ثانیه) برای تصادفی‌بودن. اگر ۰ یا کوچک‌تر/مساویِ حداقل باشد، فاصله ثابت است. */
+    val delayMaxSeconds: Int = 0,
     /** اگر روشن باشد، عبارت {نام} در متن با نام مخاطب جایگزین می‌شود. */
     val personalizeWithName: Boolean = false,
     /** فقط شماره‌هایی که با این پیش‌شماره‌ها شروع می‌شوند پیام می‌گیرند (با کاما جدا). خالی = همه. */
@@ -45,6 +48,7 @@ class SettingsRepository(private val context: Context) {
         val START_HOUR = intPreferencesKey("start_hour")
         val END_HOUR = intPreferencesKey("end_hour")
         val DELAY_SECONDS = intPreferencesKey("delay_seconds")
+        val DELAY_MAX_SECONDS = intPreferencesKey("delay_max_seconds")
         val PERSONALIZE = booleanPreferencesKey("personalize_with_name")
         val PREFIXES = stringPreferencesKey("number_prefixes")
         val EXCLUDED = stringPreferencesKey("excluded_numbers")
@@ -62,6 +66,7 @@ class SettingsRepository(private val context: Context) {
             startHour = p[Keys.START_HOUR] ?: 20,
             endHour = p[Keys.END_HOUR] ?: 22,
             delaySeconds = p[Keys.DELAY_SECONDS] ?: 70,
+            delayMaxSeconds = p[Keys.DELAY_MAX_SECONDS] ?: 0,
             personalizeWithName = p[Keys.PERSONALIZE] ?: false,
             numberPrefixes = p[Keys.PREFIXES] ?: "",
             excludedNumbers = p[Keys.EXCLUDED] ?: "",
@@ -80,6 +85,7 @@ class SettingsRepository(private val context: Context) {
             p[Keys.START_HOUR] = settings.startHour
             p[Keys.END_HOUR] = settings.endHour
             p[Keys.DELAY_SECONDS] = settings.delaySeconds
+            p[Keys.DELAY_MAX_SECONDS] = settings.delayMaxSeconds
             p[Keys.PERSONALIZE] = settings.personalizeWithName
             p[Keys.PREFIXES] = settings.numberPrefixes
             p[Keys.EXCLUDED] = settings.excludedNumbers
@@ -106,6 +112,13 @@ class SettingsRepository(private val context: Context) {
     suspend fun clearOptedOut() {
         context.dataStore.edit { p ->
             p[Keys.OPTED_OUT] = emptySet()
+        }
+    }
+
+    /** جایگزینیِ کاملِ لیستِ لغو (برای بازیابیِ پشتیبان). */
+    suspend fun setOptedOut(numbers: Set<String>) {
+        context.dataStore.edit { p ->
+            p[Keys.OPTED_OUT] = numbers
         }
     }
 
