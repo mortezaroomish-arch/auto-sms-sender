@@ -17,7 +17,9 @@ import com.autosms.app.data.SettingsRepository
 import com.autosms.app.sms.SmsSender
 import com.autosms.app.util.PhoneUtil
 import kotlinx.coroutines.delay
+import java.text.Collator
 import java.util.Calendar
+import java.util.Locale
 
 /**
  * هستهٔ برنامه: هر شب در ساعتِ شروع اجرا می‌شود، مخاطبین جدید را همگام می‌کند،
@@ -75,12 +77,18 @@ class SmsWorker(
             val optedOut = settingsRepo.currentOptedOut()
             val blocked = excluded + optedOut
 
+            // مرتب‌سازی: اول کسانی که این دوره هنوز پیام نگرفته‌اند (تاریخِ قدیمی‌تر جلوتر)،
+            // و بینِ هم‌رتبه‌ها به‌ترتیبِ الفبای فارسیِ نام. این‌طور ارسال الفبایی جلو می‌رود
+            // و مخاطبِ جدید سرِ جای الفباییِ خودش وارد می‌شود (جا نمی‌ماند).
+            val faCollator = Collator.getInstance(Locale("fa"))
             val due = dao.getAllDue()
-                .asSequence()
                 .filter { matchesPrefix(it.phoneNumber, prefixes) }
                 .filter { PhoneUtil.toLocal(it.phoneNumber) !in blocked }
+                .sortedWith(
+                    compareBy<Customer> { it.lastSentAt ?: Long.MIN_VALUE }
+                        .thenComparator { a, b -> faCollator.compare(a.name, b.name) }
+                )
                 .take(settings.dailyCount)
-                .toList()
 
             val delayMillis = settings.delaySeconds.coerceAtLeast(1) * 1000L
 
