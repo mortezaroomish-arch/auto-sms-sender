@@ -49,7 +49,11 @@ data class AppSettings(
     /** جوابی که وقتی هیچ قانونِ کلیدواژه‌ای مطابقت نکند فرستاده می‌شود. خالی = چیزی فرستاده نشود. */
     val autoReplyDefault: String = "",
     /** قانون‌های کلیدواژه‌ای، هر خط یکی، به شکلِ «کلیدواژه = جواب». */
-    val autoReplyRules: String = ""
+    val autoReplyRules: String = "",
+    /** پیامک برای تماسِ بی‌پاسخ: اگر روشن باشد، وقتی تماسی بی‌پاسخ بماند به تماس‌گیرنده پیامک می‌رود. */
+    val missedCallReplyEnabled: Boolean = false,
+    /** متنی که برای تماسِ بی‌پاسخ فرستاده می‌شود. */
+    val missedCallReplyText: String = "در اسرع وقت با شما تماس می‌گیرم"
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -75,6 +79,9 @@ class SettingsRepository(private val context: Context) {
         val AUTO_REPLY_DEFAULT = stringPreferencesKey("auto_reply_default")
         val AUTO_REPLY_RULES = stringPreferencesKey("auto_reply_rules")
         val AUTO_REPLY_LOG = stringSetPreferencesKey("auto_reply_log")
+        val MISSED_CALL_ENABLED = booleanPreferencesKey("missed_call_enabled")
+        val MISSED_CALL_TEXT = stringPreferencesKey("missed_call_text")
+        val MISSED_CALL_LOG = stringSetPreferencesKey("missed_call_log")
         val OPTED_OUT = stringSetPreferencesKey("opted_out_numbers")
         val CYCLE_START = longPreferencesKey("cycle_start_at")
     }
@@ -96,7 +103,9 @@ class SettingsRepository(private val context: Context) {
             optOutKeyword = p[Keys.OPT_OUT_KEYWORD] ?: "لغو",
             autoReplyEnabled = p[Keys.AUTO_REPLY_ENABLED] ?: false,
             autoReplyDefault = p[Keys.AUTO_REPLY_DEFAULT] ?: "",
-            autoReplyRules = p[Keys.AUTO_REPLY_RULES] ?: ""
+            autoReplyRules = p[Keys.AUTO_REPLY_RULES] ?: "",
+            missedCallReplyEnabled = p[Keys.MISSED_CALL_ENABLED] ?: false,
+            missedCallReplyText = p[Keys.MISSED_CALL_TEXT] ?: "در اسرع وقت با شما تماس می‌گیرم"
         )
     }
 
@@ -120,6 +129,8 @@ class SettingsRepository(private val context: Context) {
             p[Keys.AUTO_REPLY_ENABLED] = settings.autoReplyEnabled
             p[Keys.AUTO_REPLY_DEFAULT] = settings.autoReplyDefault
             p[Keys.AUTO_REPLY_RULES] = settings.autoReplyRules
+            p[Keys.MISSED_CALL_ENABLED] = settings.missedCallReplyEnabled
+            p[Keys.MISSED_CALL_TEXT] = settings.missedCallReplyText
         }
     }
 
@@ -195,6 +206,40 @@ class SettingsRepository(private val context: Context) {
             }
             kept.add("$signature=$now")
             p[Keys.AUTO_REPLY_LOG] = kept
+        }
+    }
+
+    // ---- سابقهٔ پیامکِ تماسِ بی‌پاسخ (ضدِ اسپم برای تماس‌های پشت‌سرهم) ----
+
+    /** تعدادِ پیامک‌های تماسِ بی‌پاسخ به این شماره از زمانِ داده‌شده به بعد. */
+    suspend fun countMissedCallRepliesSince(number: String, sinceMillis: Long): Int {
+        val prefix = "$number="
+        val set = context.dataStore.data.map { it[Keys.MISSED_CALL_LOG] ?: emptySet() }.first()
+        var count = 0
+        for (entry in set) {
+            val idx = entry.lastIndexOf('=')
+            if (idx <= 0) continue
+            val n = entry.substring(0, idx)
+            val ts = entry.substring(idx + 1).toLongOrNull() ?: 0L
+            if ("$n=" == prefix && ts >= sinceMillis) count++
+        }
+        return count
+    }
+
+    /** ثبتِ پیامکِ تماسِ بی‌پاسخ و پاک‌کردنِ سوابقِ قدیمی‌تر از ۲۴ ساعت. */
+    suspend fun recordMissedCallReply(number: String, now: Long) {
+        val keepMillis = 24 * 60 * 60 * 1000L
+        context.dataStore.edit { p ->
+            val old = p[Keys.MISSED_CALL_LOG] ?: emptySet()
+            val kept = mutableSetOf<String>()
+            for (entry in old) {
+                val idx = entry.lastIndexOf('=')
+                if (idx <= 0) continue
+                val ts = entry.substring(idx + 1).toLongOrNull() ?: 0L
+                if (now - ts < keepMillis) kept.add(entry)
+            }
+            kept.add("$number=$now")
+            p[Keys.MISSED_CALL_LOG] = kept
         }
     }
 

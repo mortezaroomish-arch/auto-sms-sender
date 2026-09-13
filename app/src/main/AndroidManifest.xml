@@ -6,6 +6,10 @@
     <uses-permission android:name="android.permission.SEND_SMS" />
     <!-- دریافت پیامک (برای لغوِ اشتراکِ خودکار) -->
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <!-- تشخیصِ وضعیتِ تماس (برای پیامکِ تماسِ بی‌پاسخ) -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <!-- خواندنِ شماره‌ی تماس‌گیرنده‌ی بی‌پاسخ -->
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
     <!-- خواندن مخاطبین گوشی -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <!-- نمایش اعلان (Android 13+) -->
@@ -56,6 +60,16 @@
             android:permission="android.permission.BROADCAST_SMS">
             <intent-filter>
                 <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- تشخیصِ تماسِ بی‌پاسخ برای ارسالِ پیامکِ خودکار -->
+        <receiver
+            android:name=".work.PhoneStateReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PHONE_STATE" />
             </intent-filter>
         </receiver>
 
