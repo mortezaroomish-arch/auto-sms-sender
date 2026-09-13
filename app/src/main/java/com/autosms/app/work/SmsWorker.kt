@@ -73,8 +73,8 @@ class SmsWorker(
             }
 
             // ۲) انتخاب افرادِ نوبتی با اعمالِ فیلترِ پیش‌شماره، لیستِ استثنا و لیستِ لغو
-            val prefixes = parsePrefixes(settings.numberPrefixes)
-            val excluded = parseExcluded(settings.excludedNumbers)
+            val prefixes = if (settings.prefixFilterEnabled) parsePrefixes(settings.numberPrefixes) else emptyList()
+            val excluded = if (settings.excludedFilterEnabled) parseExcluded(settings.excludedNumbers) else emptySet()
             val optedOut = settingsRepo.currentOptedOut()
             val blocked = excluded + optedOut
 

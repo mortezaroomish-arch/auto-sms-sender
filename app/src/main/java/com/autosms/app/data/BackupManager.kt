@@ -44,6 +44,8 @@ object BackupManager {
         s.put("sequentialMessages", settings.sequentialMessages)
         s.put("numberPrefixes", settings.numberPrefixes)
         s.put("excludedNumbers", settings.excludedNumbers)
+        s.put("prefixFilterEnabled", settings.prefixFilterEnabled)
+        s.put("excludedFilterEnabled", settings.excludedFilterEnabled)
         s.put("autoOptOut", settings.autoOptOut)
         s.put("optOutKeyword", settings.optOutKeyword)
         s.put("autoReplyEnabled", settings.autoReplyEnabled)
@@ -88,6 +90,8 @@ object BackupManager {
             sequentialMessages = s.optBoolean("sequentialMessages", false),
             numberPrefixes = s.optString("numberPrefixes", ""),
             excludedNumbers = s.optString("excludedNumbers", ""),
+            prefixFilterEnabled = s.optBoolean("prefixFilterEnabled", true),
+            excludedFilterEnabled = s.optBoolean("excludedFilterEnabled", true),
             autoOptOut = s.optBoolean("autoOptOut", false),
             optOutKeyword = s.optString("optOutKeyword", "لغو"),
             autoReplyEnabled = s.optBoolean("autoReplyEnabled", false),
