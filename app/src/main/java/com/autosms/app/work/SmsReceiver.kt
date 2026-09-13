@@ -68,17 +68,35 @@ class SmsReceiver : BroadcastReceiver() {
 
                 // ۲) پاسخِ خودکار (اگر پیام «لغو» بود، جواب نمی‌فرستیم)
                 if (settings.autoReplyEnabled && !didOptOut) {
+                    // فقط به شماره‌های موبایلِ شخصی جواب بده، نه به اپراتور/بانک/کدهای خدماتی.
+                    if (!PhoneUtil.isReplyableSender(sender)) {
+                        Log.d(TAG, "auto-reply skipped: '$sender' is not a personal mobile number")
+                        return@launch
+                    }
+
                     val reply = AutoReplyRules.findReply(
                         body = bodyText,
                         rulesRaw = settings.autoReplyRules,
                         default = settings.autoReplyDefault
                     )
-                    if (!reply.isNullOrBlank()) {
-                        val ok = SmsSender(appContext).send(sender, reply)
-                        Log.d(TAG, "auto-reply to '$sender' sent=$ok")
-                    } else {
+                    if (reply.isNullOrBlank()) {
                         Log.d(TAG, "auto-reply: no matching rule and no default; nothing sent")
+                        return@launch
                     }
+
+                    // جلوگیری از ارسالِ مکرر/حلقه: در بازهٔ «فاصلهٔ پاسخ» بیش از یک بار جواب نده.
+                    val local = PhoneUtil.toLocal(sender)
+                    val now = System.currentTimeMillis()
+                    val cooldownMs = settings.autoReplyCooldownMinutes.coerceAtLeast(0) * 60_000L
+                    val last = repo.lastAutoReplyAt(local)
+                    if (cooldownMs > 0 && last > 0 && now - last < cooldownMs) {
+                        Log.d(TAG, "auto-reply skipped: cooldown active for $local")
+                        return@launch
+                    }
+
+                    val ok = SmsSender(appContext).send(sender, reply)
+                    if (ok) repo.recordAutoReply(local, now)
+                    Log.d(TAG, "auto-reply to '$sender' sent=$ok")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "error: ${e.message}", e)

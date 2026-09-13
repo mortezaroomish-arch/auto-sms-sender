@@ -49,7 +49,12 @@ data class AppSettings(
     /** جوابی که وقتی هیچ قانونِ کلیدواژه‌ای مطابقت نکند فرستاده می‌شود. خالی = چیزی فرستاده نشود. */
     val autoReplyDefault: String = "",
     /** قانون‌های کلیدواژه‌ای، هر خط یکی، به شکلِ «کلیدواژه = جواب». */
-    val autoReplyRules: String = ""
+    val autoReplyRules: String = "",
+    /**
+     * حداقلِ فاصله (دقیقه) بینِ دو پاسخِ خودکار به یک شماره. جلوی ارسالِ مکرر و حلقه را می‌گیرد.
+     * ۰ یعنی محدودیتی نباشد (به هر پیام جواب بده).
+     */
+    val autoReplyCooldownMinutes: Int = 10
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -74,6 +79,8 @@ class SettingsRepository(private val context: Context) {
         val AUTO_REPLY_ENABLED = booleanPreferencesKey("auto_reply_enabled")
         val AUTO_REPLY_DEFAULT = stringPreferencesKey("auto_reply_default")
         val AUTO_REPLY_RULES = stringPreferencesKey("auto_reply_rules")
+        val AUTO_REPLY_COOLDOWN = intPreferencesKey("auto_reply_cooldown_minutes")
+        val AUTO_REPLY_LOG = stringSetPreferencesKey("auto_reply_log")
         val OPTED_OUT = stringSetPreferencesKey("opted_out_numbers")
         val CYCLE_START = longPreferencesKey("cycle_start_at")
     }
@@ -95,7 +102,8 @@ class SettingsRepository(private val context: Context) {
             optOutKeyword = p[Keys.OPT_OUT_KEYWORD] ?: "لغو",
             autoReplyEnabled = p[Keys.AUTO_REPLY_ENABLED] ?: false,
             autoReplyDefault = p[Keys.AUTO_REPLY_DEFAULT] ?: "",
-            autoReplyRules = p[Keys.AUTO_REPLY_RULES] ?: ""
+            autoReplyRules = p[Keys.AUTO_REPLY_RULES] ?: "",
+            autoReplyCooldownMinutes = p[Keys.AUTO_REPLY_COOLDOWN] ?: 10
         )
     }
 
@@ -119,6 +127,39 @@ class SettingsRepository(private val context: Context) {
             p[Keys.AUTO_REPLY_ENABLED] = settings.autoReplyEnabled
             p[Keys.AUTO_REPLY_DEFAULT] = settings.autoReplyDefault
             p[Keys.AUTO_REPLY_RULES] = settings.autoReplyRules
+            p[Keys.AUTO_REPLY_COOLDOWN] = settings.autoReplyCooldownMinutes
+        }
+    }
+
+    // ---- سابقهٔ پاسخِ خودکار (برای جلوگیری از ارسالِ مکرر به یک شماره) ----
+
+    /** آخرین زمانی که به این شماره پاسخِ خودکار داده‌ایم (میلی‌ثانیه؛ ۰ = هرگز). */
+    suspend fun lastAutoReplyAt(number: String): Long {
+        val set = context.dataStore.data.map { it[Keys.AUTO_REPLY_LOG] ?: emptySet() }.first()
+        for (entry in set) {
+            val idx = entry.lastIndexOf('=')
+            if (idx > 0 && entry.substring(0, idx) == number) {
+                return entry.substring(idx + 1).toLongOrNull() ?: 0L
+            }
+        }
+        return 0L
+    }
+
+    /** ثبتِ زمانِ پاسخِ خودکار به یک شماره و پاک‌کردنِ سوابقِ قدیمی‌تر از ۲۴ ساعت. */
+    suspend fun recordAutoReply(number: String, now: Long) {
+        val keepMillis = 24 * 60 * 60 * 1000L
+        context.dataStore.edit { p ->
+            val old = p[Keys.AUTO_REPLY_LOG] ?: emptySet()
+            val kept = mutableSetOf<String>()
+            for (entry in old) {
+                val idx = entry.lastIndexOf('=')
+                if (idx <= 0) continue
+                val n = entry.substring(0, idx)
+                val ts = entry.substring(idx + 1).toLongOrNull() ?: 0L
+                if (n != number && now - ts < keepMillis) kept.add(entry)
+            }
+            kept.add("$number=$now")
+            p[Keys.AUTO_REPLY_LOG] = kept
         }
     }
 
