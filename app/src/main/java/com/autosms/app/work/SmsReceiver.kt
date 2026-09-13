@@ -23,6 +23,9 @@ class SmsReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "SmsReceiver"
+
+        /** محافظِ ضدِ حلقه: بیشتر از این تعداد پاسخِ خودکار به یک شماره در یک ساعت فرستاده نمی‌شود. */
+        private const val MAX_REPLIES_PER_HOUR = 8
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -68,17 +71,42 @@ class SmsReceiver : BroadcastReceiver() {
 
                 // ۲) پاسخِ خودکار (اگر پیام «لغو» بود، جواب نمی‌فرستیم)
                 if (settings.autoReplyEnabled && !didOptOut) {
+                    // فقط به شماره‌های موبایلِ شخصی جواب بده، نه به اپراتور/بانک/کدهای خدماتی.
+                    if (!PhoneUtil.isReplyableSender(sender)) {
+                        Log.d(TAG, "auto-reply skipped: '$sender' is not a personal mobile number")
+                        return@launch
+                    }
+
                     val reply = AutoReplyRules.findReply(
                         body = bodyText,
                         rulesRaw = settings.autoReplyRules,
                         default = settings.autoReplyDefault
                     )
-                    if (!reply.isNullOrBlank()) {
-                        val ok = SmsSender(appContext).send(sender, reply)
-                        Log.d(TAG, "auto-reply to '$sender' sent=$ok")
-                    } else {
+                    if (reply.isNullOrBlank()) {
                         Log.d(TAG, "auto-reply: no matching rule and no default; nothing sent")
+                        return@launch
                     }
+
+                    val local = PhoneUtil.toLocal(sender)
+                    val bodyHash = bodyText.trim().hashCode()
+                    val now = System.currentTimeMillis()
+
+                    // «یک جواب برای هر پیامک»: اگر قبلاً دقیقاً به همین پیام جواب داده‌ایم، دیگر جواب نده.
+                    if (repo.alreadyRepliedToMessage(local, bodyHash)) {
+                        Log.d(TAG, "auto-reply skipped: already replied to this exact message from $local")
+                        return@launch
+                    }
+
+                    // محافظِ ضدِ حلقه: حداکثر چند پاسخ به یک شماره در هر ساعت (جلوی ارسالِ بی‌پایان را می‌گیرد).
+                    val oneHourAgo = now - 60 * 60 * 1000L
+                    if (repo.countAutoRepliesSince(local, oneHourAgo) >= MAX_REPLIES_PER_HOUR) {
+                        Log.d(TAG, "auto-reply skipped: hourly limit reached for $local")
+                        return@launch
+                    }
+
+                    val ok = SmsSender(appContext).send(sender, reply)
+                    if (ok) repo.recordAutoReply(local, bodyHash, now)
+                    Log.d(TAG, "auto-reply to '$sender' sent=$ok")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "error: ${e.message}", e)
