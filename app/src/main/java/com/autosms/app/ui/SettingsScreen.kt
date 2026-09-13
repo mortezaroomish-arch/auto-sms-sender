@@ -216,6 +216,7 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
                             StatItem(label = "امروز", value = stats.sentToday)
+                            StatItem(label = "این هفته", value = stats.sentThisWeek)
                             StatItem(label = "این ماه", value = stats.sentThisMonth)
                             StatItem(label = "کل", value = stats.totalSentEver)
                         }

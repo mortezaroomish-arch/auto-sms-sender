@@ -32,6 +32,7 @@ data class Stats(
     val totalCustomers: Int = 0,
     val neverSent: Int = 0,
     val sentToday: Int = 0,
+    val sentThisWeek: Int = 0,
     val sentThisMonth: Int = 0,
     val totalSentEver: Int = 0
 )
@@ -290,13 +291,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val total = withContext(Dispatchers.IO) { dao.count() }
             val never = withContext(Dispatchers.IO) { dao.countNeverSent() }
             val today = withContext(Dispatchers.IO) { dao.countSince(startOfToday()) }
+            val week = withContext(Dispatchers.IO) { dao.countSince(startOfWeek()) }
             val month = withContext(Dispatchers.IO) { dao.countSince(startOfMonth()) }
             val ever = withContext(Dispatchers.IO) { dao.countSent() }
             val recent = withContext(Dispatchers.IO) { dao.getRecentSent() }
             val optedOut = withContext(Dispatchers.IO) { settingsRepo.currentOptedOut().size }
             _history.value = recent
             _optedOutCount.value = optedOut
-            _stats.value = Stats(total, never, today, month, ever)
+            _stats.value = Stats(total, never, today, week, month, ever)
             _nextRun.value = if (_settings.value.enabled) {
                 JalaliDate.format(computeNextRun(_settings.value.startHour))
             } else {
@@ -325,6 +327,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         c.set(Calendar.MINUTE, 0)
         c.set(Calendar.SECOND, 0)
         c.set(Calendar.MILLISECOND, 0)
+        return c.timeInMillis
+    }
+
+    /** شروعِ هفته: نزدیک‌ترین شنبه‌ی گذشته، ساعت ۰۰:۰۰ (هفته در ایران از شنبه شروع می‌شود). */
+    private fun startOfWeek(): Long {
+        val c = Calendar.getInstance()
+        c.set(Calendar.HOUR_OF_DAY, 0)
+        c.set(Calendar.MINUTE, 0)
+        c.set(Calendar.SECOND, 0)
+        c.set(Calendar.MILLISECOND, 0)
+        while (c.get(Calendar.DAY_OF_WEEK) != Calendar.SATURDAY) {
+            c.add(Calendar.DAY_OF_YEAR, -1)
+        }
         return c.timeInMillis
     }
 
