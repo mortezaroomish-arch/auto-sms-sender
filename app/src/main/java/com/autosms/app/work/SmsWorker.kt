@@ -98,14 +98,16 @@ class SmsWorker(
                 pool = eligible
             }
 
-            // در حالتِ «ترتیبی» یک متنِ ثابت برای کلِ این دوره انتخاب می‌شود؛ در غیرِ این‌صورت
-            // در هر ارسال متنی تصادفی انتخاب می‌گردد (fixedTemplate = null).
+            // انتخابِ متن برای این دوره:
+            //  - اگر «ترتیبی» روشن باشد و چند متن باشد: متنِ این دوره بر اساسِ شمارهٔ دوره
+            //    (هر دوره متنِ بعدی؛ پس تکراری فرستاده نمی‌شود).
+            //  - در غیرِ این‌صورت: همیشه متنِ پیش‌فرض (اولین متن) فرستاده می‌شود.
             val variants = MessageTemplates.variants(settings.messageText)
-            val fixedTemplate: String? =
+            val messageForCycle: String =
                 if (settings.sequentialMessages && variants.size > 1) {
                     variants[settingsRepo.currentCycleMessageIndex() % variants.size]
                 } else {
-                    null
+                    variants.firstOrNull() ?: settings.messageText.trim()
                 }
 
             // مرتب‌سازی «بر اساسِ نامِ الفباییِ فارسی» به‌عنوانِ کلیدِ اصلی (نه تاریخِ ارسال)،
@@ -125,7 +127,7 @@ class SmsWorker(
             for ((index, customer) in due.withIndex()) {
                 if (!manual && isPastEndHour(settings.endHour)) break
 
-                val text = buildMessage(settings, customer, fixedTemplate)
+                val text = buildMessage(settings, customer, messageForCycle)
                 val ok = smsSender.send(customer.phoneNumber, text)
                 if (ok) {
                     dao.markSent(customer.phoneNumber, System.currentTimeMillis())
@@ -153,15 +155,13 @@ class SmsWorker(
     }
 
     /**
-     * ساختِ متنِ پیام. اگر [fixedTemplate] داده شده باشد (حالتِ ترتیبی) همان استفاده می‌شود؛
-     * وگرنه از بینِ متن‌ها یکی تصادفی انتخاب می‌گردد. سپس در صورتِ روشن‌بودنِ شخصی‌سازی،
+     * ساختِ متنِ پیام از متنِ انتخاب‌شدهٔ این دوره. در صورتِ روشن‌بودنِ شخصی‌سازی،
      * {نام} با نامِ مخاطب جایگزین می‌شود.
      */
-    private fun buildMessage(settings: AppSettings, customer: Customer, fixedTemplate: String?): String {
-        val base = fixedTemplate ?: MessageTemplates.pick(settings.messageText)
-        if (!settings.personalizeWithName) return base
+    private fun buildMessage(settings: AppSettings, customer: Customer, template: String): String {
+        if (!settings.personalizeWithName) return template
         val name = cleanName(customer.name)
-        return base.replace("{نام}", name)
+        return template.replace("{نام}", name)
     }
 
     /** حذفِ «دکتر»ِ ابتداییِ نام تا هنگام شخصی‌سازی تکراری نشود. */

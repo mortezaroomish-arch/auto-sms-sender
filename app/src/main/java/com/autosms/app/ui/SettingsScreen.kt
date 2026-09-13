@@ -334,7 +334,8 @@ fun SettingsScreen(
                     minLines = 3
                 )
                 Text(
-                    "می‌توانی چند متنِ متفاوت بنویسی و بینشان یک خط با «---» بگذاری. مثال:\n" +
+                    "می‌توانی چند متنِ آماده بنویسی و بینشان یک خط با «---» بگذاری. اولین متن، " +
+                        "«متنِ پیش‌فرض» است. مثال:\n" +
                         "سلام دکتر {نام}، جلسهٔ بازآموزی...\n---\nدرود دکتر {نام}، برنامهٔ این هفته...",
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -347,7 +348,7 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("جلوگیری از تکرارِ متن", style = MaterialTheme.typography.titleMedium)
+                            Text("تغییرِ متن در هر دوره", style = MaterialTheme.typography.titleMedium)
                             Switch(
                                 checked = settings.sequentialMessages,
                                 onCheckedChange = { checked ->
@@ -357,9 +358,9 @@ fun SettingsScreen(
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "اگر روشن باشد و چند متن نوشته باشی، در هر دوره یک متن به‌ترتیب استفاده می‌شود " +
-                                "و دوره‌ی بعد متنِ بعدی؛ این‌طور یک نفر دو دوره‌ی پشتِ‌سرِهم متنِ تکراری نمی‌گیرد. " +
-                                "اگر خاموش باشد، در هر ارسال یک متن به‌صورتِ تصادفی انتخاب می‌شود.",
+                            "روشن: بعد از اینکه یک دوره‌ی کامل تمام شد و از اول شروع می‌کند، متن عوض می‌شود " +
+                                "و متنِ بعدیِ ذخیره‌شده می‌رود (پس یک نفر دو دوره‌ی پشتِ‌سرِهم متنِ تکراری نمی‌گیرد).\n" +
+                                "خاموش: همیشه متنِ پیش‌فرض (اولین متن) فرستاده می‌شود.",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
