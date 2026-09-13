@@ -79,6 +79,7 @@ fun SettingsScreen(
     var newContactName by rememberSaveable { mutableStateOf("") }
     var newContactPhone by rememberSaveable { mutableStateOf("") }
     var historyExpanded by rememberSaveable { mutableStateOf(false) }
+    var contactsExpanded by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
     val receiveSmsLauncher = rememberLauncherForActivityResult(
@@ -238,7 +239,23 @@ fun SettingsScreen(
                 // مدیریتِ مخاطبین
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("مدیریتِ مخاطبین", style = MaterialTheme.typography.titleMedium)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("مدیریتِ مخاطبین", style = MaterialTheme.typography.titleMedium)
+                            TextButton(onClick = { contactsExpanded = !contactsExpanded }) {
+                                Text(if (contactsExpanded) "بستن ▲" else "نمایش ▼")
+                            }
+                        }
+                        if (!contactsExpanded) {
+                            Text(
+                                "برای افزودن، جست‌وجو یا حذفِ مخاطب، «نمایش» را بزن.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        if (contactsExpanded) {
                         Spacer(Modifier.height(8.dp))
                         Text(
                             "افزودنِ دستیِ مخاطب یا حذفِ مخاطب. اگر شماره‌ای که وارد می‌کنی از قبل باشد، فقط نامش به‌روز می‌شود.",
@@ -311,6 +328,7 @@ fun SettingsScreen(
                                     }
                                 }
                             }
+                        }
                         }
                     }
                 }
