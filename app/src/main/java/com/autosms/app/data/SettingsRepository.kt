@@ -74,6 +74,7 @@ class SettingsRepository(private val context: Context) {
         val AUTO_REPLY_ENABLED = booleanPreferencesKey("auto_reply_enabled")
         val AUTO_REPLY_DEFAULT = stringPreferencesKey("auto_reply_default")
         val AUTO_REPLY_RULES = stringPreferencesKey("auto_reply_rules")
+        val AUTO_REPLY_LOG = stringSetPreferencesKey("auto_reply_log")
         val OPTED_OUT = stringSetPreferencesKey("opted_out_numbers")
         val CYCLE_START = longPreferencesKey("cycle_start_at")
     }
@@ -147,6 +148,53 @@ class SettingsRepository(private val context: Context) {
     suspend fun setOptedOut(numbers: Set<String>) {
         context.dataStore.edit { p ->
             p[Keys.OPTED_OUT] = numbers
+        }
+    }
+
+    // ---- سابقهٔ پاسخِ خودکار: «یک جواب برای هر پیامک» + جلوگیری از حلقه ----
+    // هر ورودی به شکلِ «شماره#کدِ‌متن=زمان» ذخیره می‌شود.
+
+    /** آیا قبلاً دقیقاً به همین پیام (همین شماره + همین متن) جواب داده‌ایم؟ */
+    suspend fun alreadyRepliedToMessage(number: String, bodyHash: Int): Boolean {
+        val signature = "$number#$bodyHash"
+        val set = context.dataStore.data.map { it[Keys.AUTO_REPLY_LOG] ?: emptySet() }.first()
+        for (entry in set) {
+            val idx = entry.lastIndexOf('=')
+            if (idx > 0 && entry.substring(0, idx) == signature) return true
+        }
+        return false
+    }
+
+    /** تعدادِ پاسخ‌های خودکار به این شماره از زمانِ داده‌شده به بعد (برای محافظِ ضدِ حلقه). */
+    suspend fun countAutoRepliesSince(number: String, sinceMillis: Long): Int {
+        val prefix = "$number#"
+        val set = context.dataStore.data.map { it[Keys.AUTO_REPLY_LOG] ?: emptySet() }.first()
+        var count = 0
+        for (entry in set) {
+            val idx = entry.lastIndexOf('=')
+            if (idx <= 0) continue
+            val sig = entry.substring(0, idx)
+            val ts = entry.substring(idx + 1).toLongOrNull() ?: 0L
+            if (sig.startsWith(prefix) && ts >= sinceMillis) count++
+        }
+        return count
+    }
+
+    /** ثبتِ پاسخِ خودکار و پاک‌کردنِ سوابقِ قدیمی‌تر از ۲۴ ساعت. */
+    suspend fun recordAutoReply(number: String, bodyHash: Int, now: Long) {
+        val signature = "$number#$bodyHash"
+        val keepMillis = 24 * 60 * 60 * 1000L
+        context.dataStore.edit { p ->
+            val old = p[Keys.AUTO_REPLY_LOG] ?: emptySet()
+            val kept = mutableSetOf<String>()
+            for (entry in old) {
+                val idx = entry.lastIndexOf('=')
+                if (idx <= 0) continue
+                val ts = entry.substring(idx + 1).toLongOrNull() ?: 0L
+                if (now - ts < keepMillis) kept.add(entry)
+            }
+            kept.add("$signature=$now")
+            p[Keys.AUTO_REPLY_LOG] = kept
         }
     }
 
