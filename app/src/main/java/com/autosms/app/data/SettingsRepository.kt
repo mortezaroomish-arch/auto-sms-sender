@@ -40,7 +40,16 @@ data class AppSettings(
     /** لغوِ اشتراکِ خودکار: اگر روشن باشد، هرکس در جواب «لغو» بفرستد حذف می‌شود. */
     val autoOptOut: Boolean = false,
     /** کلمه‌ای که در پیامِ ورودی نشانهٔ لغو است. */
-    val optOutKeyword: String = "لغو"
+    val optOutKeyword: String = "لغو",
+    /**
+     * پاسخِ خودکار به پیامکِ ورودی: اگر روشن باشد، وقتی کسی پیامک می‌فرستد برنامه خودکار
+     * جواب می‌دهد. اول قانون‌های کلیدواژه‌ای بررسی می‌شوند و اگر هیچ‌کدام نبود، جوابِ پیش‌فرض می‌رود.
+     */
+    val autoReplyEnabled: Boolean = false,
+    /** جوابی که وقتی هیچ قانونِ کلیدواژه‌ای مطابقت نکند فرستاده می‌شود. خالی = چیزی فرستاده نشود. */
+    val autoReplyDefault: String = "",
+    /** قانون‌های کلیدواژه‌ای، هر خط یکی، به شکلِ «کلیدواژه = جواب». */
+    val autoReplyRules: String = ""
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -62,6 +71,9 @@ class SettingsRepository(private val context: Context) {
         val EXCLUDED = stringPreferencesKey("excluded_numbers")
         val AUTO_OPT_OUT = booleanPreferencesKey("auto_opt_out")
         val OPT_OUT_KEYWORD = stringPreferencesKey("opt_out_keyword")
+        val AUTO_REPLY_ENABLED = booleanPreferencesKey("auto_reply_enabled")
+        val AUTO_REPLY_DEFAULT = stringPreferencesKey("auto_reply_default")
+        val AUTO_REPLY_RULES = stringPreferencesKey("auto_reply_rules")
         val OPTED_OUT = stringSetPreferencesKey("opted_out_numbers")
         val CYCLE_START = longPreferencesKey("cycle_start_at")
     }
@@ -80,7 +92,10 @@ class SettingsRepository(private val context: Context) {
             numberPrefixes = p[Keys.PREFIXES] ?: "",
             excludedNumbers = p[Keys.EXCLUDED] ?: "",
             autoOptOut = p[Keys.AUTO_OPT_OUT] ?: false,
-            optOutKeyword = p[Keys.OPT_OUT_KEYWORD] ?: "لغو"
+            optOutKeyword = p[Keys.OPT_OUT_KEYWORD] ?: "لغو",
+            autoReplyEnabled = p[Keys.AUTO_REPLY_ENABLED] ?: false,
+            autoReplyDefault = p[Keys.AUTO_REPLY_DEFAULT] ?: "",
+            autoReplyRules = p[Keys.AUTO_REPLY_RULES] ?: ""
         )
     }
 
@@ -101,6 +116,9 @@ class SettingsRepository(private val context: Context) {
             p[Keys.EXCLUDED] = settings.excludedNumbers
             p[Keys.AUTO_OPT_OUT] = settings.autoOptOut
             p[Keys.OPT_OUT_KEYWORD] = settings.optOutKeyword
+            p[Keys.AUTO_REPLY_ENABLED] = settings.autoReplyEnabled
+            p[Keys.AUTO_REPLY_DEFAULT] = settings.autoReplyDefault
+            p[Keys.AUTO_REPLY_RULES] = settings.autoReplyRules
         }
     }
 

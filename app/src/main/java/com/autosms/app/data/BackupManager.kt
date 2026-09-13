@@ -46,6 +46,9 @@ object BackupManager {
         s.put("excludedNumbers", settings.excludedNumbers)
         s.put("autoOptOut", settings.autoOptOut)
         s.put("optOutKeyword", settings.optOutKeyword)
+        s.put("autoReplyEnabled", settings.autoReplyEnabled)
+        s.put("autoReplyDefault", settings.autoReplyDefault)
+        s.put("autoReplyRules", settings.autoReplyRules)
         root.put("settings", s)
 
         val arr = JSONArray()
@@ -84,7 +87,10 @@ object BackupManager {
             numberPrefixes = s.optString("numberPrefixes", ""),
             excludedNumbers = s.optString("excludedNumbers", ""),
             autoOptOut = s.optBoolean("autoOptOut", false),
-            optOutKeyword = s.optString("optOutKeyword", "لغو")
+            optOutKeyword = s.optString("optOutKeyword", "لغو"),
+            autoReplyEnabled = s.optBoolean("autoReplyEnabled", false),
+            autoReplyDefault = s.optString("autoReplyDefault", ""),
+            autoReplyRules = s.optString("autoReplyRules", "")
         )
 
         val customers = mutableListOf<Customer>()

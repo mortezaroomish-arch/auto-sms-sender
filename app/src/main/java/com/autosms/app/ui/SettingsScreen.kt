@@ -375,6 +375,65 @@ fun SettingsScreen(
                     }
                 }
 
+                // پاسخِ خودکار به پیامکِ ورودی
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("🤖 پاسخِ خودکار", style = MaterialTheme.typography.titleMedium)
+                            Switch(
+                                checked = settings.autoReplyEnabled,
+                                onCheckedChange = { checked ->
+                                    viewModel.updateSettings { it.copy(autoReplyEnabled = checked) }
+                                    if (checked && ContextCompat.checkSelfPermission(
+                                            context, Manifest.permission.RECEIVE_SMS
+                                        ) != PackageManager.PERMISSION_GRANTED
+                                    ) {
+                                        receiveSmsLauncher.launch(Manifest.permission.RECEIVE_SMS)
+                                    }
+                                }
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "اگر روشن باشد، وقتی کسی برایت پیامک بفرستد برنامه خودکار جواب می‌دهد. " +
+                                "اول قانون‌های کلیدواژه‌ای بررسی می‌شوند؛ اگر هیچ‌کدام در متنِ پیام نبود، " +
+                                "«جوابِ پیش‌فرض» فرستاده می‌شود. (نیاز به مجوزِ «دریافت پیامک» دارد.)",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = settings.autoReplyDefault,
+                            onValueChange = { text -> viewModel.updateSettings { it.copy(autoReplyDefault = text) } },
+                            label = { Text("جوابِ پیش‌فرض") },
+                            placeholder = { Text("سلام، پیام‌تان دریافت شد؛ به‌زودی پاسخ می‌دهیم.") },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 2
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = settings.autoReplyRules,
+                            onValueChange = { text -> viewModel.updateSettings { it.copy(autoReplyRules = text) } },
+                            label = { Text("قانون‌های کلیدواژه‌ای (هر خط یک قانون)") },
+                            placeholder = { Text("قیمت = هزینهٔ بازآموزی ... تومان است\nآدرس = تهران، خیابان ...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 3
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "قالبِ هر خط: «کلیدواژه = جواب». اگر کلیدواژه در متنِ پیامِ دریافتی باشد، همان جواب " +
+                                "فرستاده می‌شود. مثال: اگر کسی بنویسد «قیمت چند؟»، چون کلمهٔ «قیمت» در آن هست، " +
+                                "جوابِ مربوط به «قیمت» می‌رود.\n" +
+                                "نکته: تغییرات پس از زدنِ دکمهٔ «💾 ذخیرهٔ تنظیمات» اعمال می‌شوند.\n" +
+                                "توجه: هر پاسخِ خودکار یک پیامکِ واقعی از سیم‌کارتِ توست و هزینه دارد.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+
                 // متن پیامک
                 OutlinedTextField(
                     value = settings.messageText,
