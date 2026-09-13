@@ -340,6 +340,7 @@ fun SettingsScreen(
                                 }
                             )
                         }
+                        if (settings.autoOptOut) {
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(
                             value = settings.optOutKeyword,
@@ -354,6 +355,7 @@ fun SettingsScreen(
                         Spacer(Modifier.height(4.dp))
                         OutlinedButton(onClick = { viewModel.clearOptOut() }) {
                             Text("پاک‌کردنِ لیستِ لغو")
+                        }
                         }
                     }
                 }
