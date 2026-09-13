@@ -135,7 +135,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 return@launch
             }
             val base = MessageTemplates.variants(s.messageText).firstOrNull() ?: s.messageText.trim()
-            val text = if (s.personalizeWithName) base.replace("{نام}", "دوست") else base
+            val text = if (s.personalizeWithName) base.replace("(نام)", "دوست").replace("{نام}", "دوست") else base
             val ok = withContext(Dispatchers.IO) { smsSender.send(phoneNumber, text) }
             _message.value = if (ok) "پیامک آزمایشی ارسال شد." else "ارسال پیامک آزمایشی ناموفق بود."
         }

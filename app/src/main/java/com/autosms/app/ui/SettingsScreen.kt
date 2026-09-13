@@ -333,7 +333,7 @@ fun SettingsScreen(
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "«{نام}» در متن با نامِ مخاطب جایگزین می‌شود.",
+                            "«(نام)» در متن با نامِ مخاطب جایگزین می‌شود.",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -727,7 +727,7 @@ private fun MessageListEditor(
                         messages[index] = it
                         onChange(messages.joinToString(separator))
                     },
-                    placeholder = { Text("سلام دکتر {نام}، ...") },
+                    placeholder = { Text("سلام دکتر (نام)، ...") },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2
                 )
