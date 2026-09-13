@@ -77,6 +77,13 @@ class SmsReceiver : BroadcastReceiver() {
                         return@launch
                     }
 
+                    // اگر متنِ دریافتی خودش یکی از جواب‌های خودکارِ ماست، یعنی جوابِ خودمان برگشته
+                    // (حلقه) — جواب نده. این جلوی حلقه‌ی «با شما تماس می‌گیریم» را می‌گیرد.
+                    if (AutoReplyRules.isOwnReply(bodyText, settings.autoReplyRules, settings.autoReplyDefault)) {
+                        Log.d(TAG, "auto-reply skipped: incoming text is our own reply (loop guard)")
+                        return@launch
+                    }
+
                     val reply = AutoReplyRules.findReply(
                         body = bodyText,
                         rulesRaw = settings.autoReplyRules,
