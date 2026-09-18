@@ -53,6 +53,11 @@ object BackupManager {
         s.put("autoReplyRules", settings.autoReplyRules)
         s.put("missedCallReplyEnabled", settings.missedCallReplyEnabled)
         s.put("missedCallReplyText", settings.missedCallReplyText)
+        s.put("dualSimEnabled", settings.dualSimEnabled)
+        s.put("sim1SubId", settings.sim1SubId)
+        s.put("sim2SubId", settings.sim2SubId)
+        s.put("sim2MessageText", settings.sim2MessageText)
+        s.put("simDailyLimit", settings.simDailyLimit)
         root.put("settings", s)
 
         val arr = JSONArray()
@@ -98,7 +103,12 @@ object BackupManager {
             autoReplyDefault = s.optString("autoReplyDefault", ""),
             autoReplyRules = s.optString("autoReplyRules", ""),
             missedCallReplyEnabled = s.optBoolean("missedCallReplyEnabled", false),
-            missedCallReplyText = s.optString("missedCallReplyText", "در اسرع وقت با شما تماس می‌گیرم")
+            missedCallReplyText = s.optString("missedCallReplyText", "در اسرع وقت با شما تماس می‌گیرم"),
+            dualSimEnabled = s.optBoolean("dualSimEnabled", false),
+            sim1SubId = s.optInt("sim1SubId", -1),
+            sim2SubId = s.optInt("sim2SubId", -1),
+            sim2MessageText = s.optString("sim2MessageText", ""),
+            simDailyLimit = s.optInt("simDailyLimit", 300)
         )
 
         val customers = mutableListOf<Customer>()

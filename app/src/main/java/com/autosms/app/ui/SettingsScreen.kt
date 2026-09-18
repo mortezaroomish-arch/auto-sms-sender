@@ -73,6 +73,7 @@ fun SettingsScreen(
     val history by viewModel.history.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val availableSims by viewModel.availableSims.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
     var testNumber by rememberSaveable { mutableStateOf("") }
@@ -90,6 +91,10 @@ fun SettingsScreen(
     val phonePermsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { }
+    // مجوزِ خواندنِ اطلاعاتِ سیم برای حالتِ دو سیم‌کارت؛ پس از اعطا، سیم‌ها دوباره خوانده می‌شوند.
+    val simPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { viewModel.loadSims() }
 
     // انتخابِ فایل برای ذخیره/خواندنِ پشتیبان
     val exportLauncher = rememberLauncherForActivityResult(
@@ -520,6 +525,113 @@ fun SettingsScreen(
                     }
                 }
 
+                // دو سیم‌کارت — پخشِ پیام‌ها بینِ دو سیم برای ارسالِ بیشتر در روز
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("📶 دو سیم‌کارت", style = MaterialTheme.typography.titleMedium)
+                            Switch(
+                                checked = settings.dualSimEnabled,
+                                onCheckedChange = { checked ->
+                                    viewModel.updateSettings { it.copy(dualSimEnabled = checked) }
+                                    if (checked) {
+                                        if (ContextCompat.checkSelfPermission(
+                                                context, Manifest.permission.READ_PHONE_STATE
+                                            ) != PackageManager.PERMISSION_GRANTED
+                                        ) {
+                                            simPermLauncher.launch(Manifest.permission.READ_PHONE_STATE)
+                                        } else {
+                                            viewModel.loadSims()
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "پیام‌ها یکی‌درمیان بینِ دو سیم فرستاده می‌شوند تا بتوانی بیش از حدِ روزانه‌ی یک سیم پیامک بدهی.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+
+                        if (settings.dualSimEnabled) {
+                            Spacer(Modifier.height(12.dp))
+                            when {
+                                availableSims.size < 2 -> {
+                                    Text(
+                                        "⚠️ دو سیم‌کارتِ فعال پیدا نشد. اگر گوشی دو سیم دارد، مجوزِ «تلفن» را بده و دوباره بررسی کن.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color(0xFFB00020)
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    OutlinedButton(onClick = {
+                                        if (ContextCompat.checkSelfPermission(
+                                                context, Manifest.permission.READ_PHONE_STATE
+                                            ) != PackageManager.PERMISSION_GRANTED
+                                        ) {
+                                            simPermLauncher.launch(Manifest.permission.READ_PHONE_STATE)
+                                        } else {
+                                            viewModel.loadSims()
+                                        }
+                                    }) {
+                                        Text("🔄 بررسیِ دوباره‌ی سیم‌ها")
+                                    }
+                                }
+                                else -> {
+                                    val sim1 = availableSims.firstOrNull { it.subscriptionId == settings.sim1SubId }
+                                    val sim2 = availableSims.firstOrNull { it.subscriptionId == settings.sim2SubId }
+                                    Text(
+                                        "① سیمِ اول: ${sim1?.label ?: "—"}",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Text(
+                                        "② سیمِ دوم: ${sim2?.label ?: "—"}",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    OutlinedButton(onClick = {
+                                        viewModel.updateSettings {
+                                            it.copy(sim1SubId = it.sim2SubId, sim2SubId = it.sim1SubId)
+                                        }
+                                    }) {
+                                        Text("🔁 جابه‌جاییِ سیمِ اول و دوم")
+                                    }
+
+                                    Spacer(Modifier.height(12.dp))
+                                    SliderField(
+                                        label = "سقفِ هر سیم در روز",
+                                        value = settings.simDailyLimit,
+                                        min = 1,
+                                        max = 500,
+                                        onValueChange = { v -> viewModel.updateSettings { it.copy(simDailyLimit = v) } }
+                                    )
+                                    Text(
+                                        "هر سیم حداکثر همین تعداد می‌فرستد (حدِ مجازِ اپراتور). با دو سیم می‌توانی تا دو برابر بفرستی؛ «تعدادِ ارسال در روز» را هم به‌اندازه بالا ببر.",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+
+                                    Spacer(Modifier.height(12.dp))
+                                    OutlinedTextField(
+                                        value = settings.sim2MessageText,
+                                        onValueChange = { text -> viewModel.updateSettings { it.copy(sim2MessageText = text) } },
+                                        label = { Text("متنِ سیمِ دوم (خالی = مثلِ متنِ اصلی)") },
+                                        placeholder = { Text("متنِ مخصوصِ سیمِ دوم را این‌جا بنویس") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        minLines = 2
+                                    )
+                                    Text(
+                                        "پیام‌هایی که از سیمِ اول می‌روند، متنِ اصلیِ بالا را می‌گیرند؛ پیام‌های سیمِ دوم، این متن را.",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // فیلترِ پیش‌شماره (با کلیدِ روشن/خاموش)
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
@@ -614,7 +726,7 @@ fun SettingsScreen(
                                 label = "تعداد ارسال در هر روز",
                                 value = settings.dailyCount,
                                 min = 1,
-                                max = 500,
+                                max = 600,
                                 onValueChange = { v -> viewModel.updateSettings { it.copy(dailyCount = v) } }
                             )
                             SliderField(
