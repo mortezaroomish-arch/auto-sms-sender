@@ -106,20 +106,29 @@ class SmsWorker(
             val cycleMessageIndex = settingsRepo.currentCycleMessageIndex()
             val messageForCycle = pickMessage(settings.messageText, settings, cycleMessageIndex)
 
-            // ---- آماده‌سازیِ حالتِ دو سیم‌کارت ----
-            // اگر روشن باشد و دستگاه دو سیمِ فعال داشته باشد، دو subId جدا و متنِ سیمِ دوم
-            // را آماده می‌کنیم. اگر متنِ سیمِ دوم خالی باشد، همان متنِ اصلی استفاده می‌شود.
+            // ---- آماده‌سازیِ کنترلِ سیم‌کارت‌ها ----
+            // «کنترلِ سیم‌کارت‌ها» (dualSimEnabled) که روشن باشد، هر سیم را جداگانه کنترل می‌کنیم:
+            //  - هر دو سیم روشن  → پیام‌ها یکی‌درمیان بینِ دو سیم می‌روند (هرکدام با متن و سقفِ خودش).
+            //  - فقط یک سیم روشن → همهٔ پیام‌ها از همان سیم می‌روند (تا سقفِ همان سیم).
+            //  - هیچ‌کدام / خاموش → مثلِ قبل از سیمِ پیش‌فرضِ سیستم فرستاده می‌شود.
             val sims = SimUtil.activeSims(context)
-            val dualSim = settings.dualSimEnabled && sims.size >= 2
-            val sim1SubId = if (dualSim) SimUtil.resolveSubId(context, settings.sim1SubId, fallbackSlot = 0) else -1
-            val sim2SubId = if (dualSim) SimUtil.resolveSubId(context, settings.sim2SubId, fallbackSlot = 1) else -1
+            val simControl = settings.dualSimEnabled && sims.isNotEmpty()
+            val sim1SubId = if (simControl) SimUtil.resolveSubId(context, settings.sim1SubId, fallbackSlot = 0) else -1
+            val sim2SubId = if (simControl) SimUtil.resolveSubId(context, settings.sim2SubId, fallbackSlot = 1) else -1
+
+            // سیمِ اول فعال است اگر: کنترل روشن + کلیدِ سیم ۱ روشن + subIdِ معتبر.
+            val sim1On = simControl && settings.sim1Enabled && sim1SubId >= 0
+            // سیمِ دوم فعال است اگر: کنترل روشن + کلیدِ سیم ۲ روشن + subIdِ معتبر + متفاوت از سیمِ اول.
+            val sim2On = simControl && settings.sim2Enabled && sim2SubId >= 0 &&
+                (sim2SubId != sim1SubId || !sim1On)
+            val bothOn = sim1On && sim2On
+
+            val cap1 = settings.sim1DailyLimit.coerceAtLeast(0)
+            val cap2 = settings.sim2DailyLimit.coerceAtLeast(0)
             val messageForSim2: String =
                 if (settings.sim2MessageText.isNotBlank())
                     pickMessage(settings.sim2MessageText, settings, cycleMessageIndex)
                 else messageForCycle
-            // سقفِ هر سیم؛ اگر دو subId یکسان شدند (خطای انتخاب)، حالتِ دو سیم را خاموش می‌کنیم.
-            val simLimit = settings.simDailyLimit.coerceAtLeast(1)
-            val useDualSim = dualSim && sim1SubId != sim2SubId
             var sentSim1 = 0
             var sentSim2 = 0
 
@@ -140,32 +149,46 @@ class SmsWorker(
             for ((index, customer) in due.withIndex()) {
                 if (!manual && isPastEndHour(settings.endHour)) break
 
-                // انتخابِ سیم برای این پیام (حالتِ دو سیم = یکی‌درمیان با رعایتِ سقفِ هر سیم).
-                val useSim2: Boolean
-                val subId: Int
-                if (useDualSim) {
-                    val sim1Full = sentSim1 >= simLimit
-                    val sim2Full = sentSim2 >= simLimit
-                    if (sim1Full && sim2Full) break // سقفِ هر دو سیم پر شد
-                    useSim2 = when {
-                        sim1Full -> true          // سیم ۱ پر است → همه به سیم ۲
-                        sim2Full -> false         // سیم ۲ پر است → همه به سیم ۱
-                        else -> index % 2 == 1    // یکی‌درمیان: زوج → سیم ۱، فرد → سیم ۲
+                // انتخابِ سیم برای این پیام:
+                //  chosen = 1 (سیم اول) / 2 (سیم دوم) / 0 (سیمِ پیش‌فرضِ سیستم).
+                var chosen = 0
+                when {
+                    bothOn -> {
+                        val sim1Full = sentSim1 >= cap1
+                        val sim2Full = sentSim2 >= cap2
+                        if (sim1Full && sim2Full) break // سقفِ هر دو سیم پر شد
+                        chosen = when {
+                            sim1Full -> 2             // سیم ۱ پر است → همه به سیم ۲
+                            sim2Full -> 1             // سیم ۲ پر است → همه به سیم ۱
+                            index % 2 == 1 -> 2       // یکی‌درمیان: زوج → سیم ۱، فرد → سیم ۲
+                            else -> 1
+                        }
                     }
-                    subId = if (useSim2) sim2SubId else sim1SubId
-                } else {
-                    useSim2 = false
-                    subId = -1
+                    sim1On -> {                       // فقط سیمِ اول روشن است
+                        if (sentSim1 >= cap1) break
+                        chosen = 1
+                    }
+                    sim2On -> {                       // فقط سیمِ دوم روشن است
+                        if (sentSim2 >= cap2) break
+                        chosen = 2
+                    }
+                    else -> chosen = 0                // سیمِ پیش‌فرضِ سیستم
                 }
 
-                val template = if (useSim2) messageForSim2 else messageForCycle
+                val subId = when (chosen) {
+                    1 -> sim1SubId
+                    2 -> sim2SubId
+                    else -> -1
+                }
+                val template = if (chosen == 2) messageForSim2 else messageForCycle
                 val text = buildMessage(settings, customer, template)
                 val ok = smsSender.send(customer.phoneNumber, text, subId)
                 if (ok) {
                     dao.markSent(customer.phoneNumber, System.currentTimeMillis())
                     sent++
-                    if (useDualSim) {
-                        if (useSim2) sentSim2++ else sentSim1++
+                    when (chosen) {
+                        1 -> sentSim1++
+                        2 -> sentSim2++
                     }
                 } else {
                     failed++
@@ -173,10 +196,10 @@ class SmsWorker(
                 setForegroundSafe(index + 1, due.size)
 
                 if (index < due.size - 1) {
-                    // در حالتِ دو سیم فاصله نصف می‌شود: چون دو سیم بارِ ارسال را تقسیم می‌کنند،
+                    // وقتی هر دو سیم فعال‌اند فاصله نصف می‌شود: چون بارِ ارسال بین دو سیم پخش می‌شود،
                     // فاصلهٔ هر سیم با پیامِ بعدیِ خودش ≈ مقدارِ تنظیم‌شده می‌ماند، ولی سرعتِ کل دوبرابر.
-                    val loMin = if (useDualSim) (minDelay / 2).coerceAtLeast(1) else minDelay
-                    val loMax = if (useDualSim) (maxDelay / 2) else maxDelay
+                    val loMin = if (bothOn) (minDelay / 2).coerceAtLeast(1) else minDelay
+                    val loMax = if (bothOn) (maxDelay / 2) else maxDelay
                     // فاصلهٔ تصادفی بینِ حداقل و حداکثر (اگر حداکثر بزرگ‌تر باشد)؛ وگرنه ثابت.
                     val seconds = if (loMax > loMin) (loMin..loMax).random() else loMin
                     delay(seconds * 1000L)

@@ -59,19 +59,25 @@ data class AppSettings(
     /** متنی که برای تماسِ بی‌پاسخ فرستاده می‌شود. */
     val missedCallReplyText: String = "در اسرع وقت با شما تماس می‌گیرم",
     /**
-     * حالتِ دو سیم‌کارت: اگر روشن باشد، پیامک‌های روزانه به‌صورتِ یکی‌درمیان بینِ دو سیم
-     * پخش می‌شوند (تا سقفِ [simDailyLimit] برای هر سیم) تا بتوان بیش از حدِ روزانه‌ی
-     * یک سیم پیامک فرستاد.
+     * کنترلِ سیم‌کارت‌ها: اگر روشن باشد، هر سیم جداگانه کنترل می‌شود (روشن/خاموش، سقف و متنِ جدا).
+     * وقتی هر دو سیم روشن باشند، پیام‌ها یکی‌درمیان بینِ دو سیم پخش می‌شوند (هرکدام تا سقفِ خودش:
+     * [sim1DailyLimit] و [sim2DailyLimit]) تا بتوان بیش از حدِ روزانه‌ی یک سیم پیامک فرستاد.
      */
     val dualSimEnabled: Boolean = false,
     /** شناسه‌ی سیستمیِ سیمِ اول (‑۱ = سیمِ جایگاهِ ۱ به‌صورتِ خودکار). */
     val sim1SubId: Int = -1,
     /** شناسه‌ی سیستمیِ سیمِ دوم (‑۱ = سیمِ جایگاهِ ۲ به‌صورتِ خودکار). */
     val sim2SubId: Int = -1,
+    /** آیا سیمِ اول در ارسال شرکت کند؟ (اگر خاموش باشد، از سیمِ اول پیام نمی‌رود.) */
+    val sim1Enabled: Boolean = true,
+    /** آیا سیمِ دوم در ارسال شرکت کند؟ (اگر خاموش باشد، از سیمِ دوم پیام نمی‌رود.) */
+    val sim2Enabled: Boolean = true,
+    /** بیشترین تعدادِ پیامک از سیمِ اول در هر اجرا (حدِ مجازِ اپراتور؛ پیش‌فرض ۳۰۰). */
+    val sim1DailyLimit: Int = 300,
+    /** بیشترین تعدادِ پیامک از سیمِ دوم در هر اجرا (حدِ مجازِ اپراتور؛ پیش‌فرض ۳۰۰). */
+    val sim2DailyLimit: Int = 300,
     /** متنِ مخصوصِ سیمِ دوم. اگر خالی باشد، همان متنِ اصلی برای سیمِ دوم استفاده می‌شود. */
-    val sim2MessageText: String = "",
-    /** بیشترین تعدادِ پیامک از هر سیم در هر اجرا (حدِ مجازِ اپراتور؛ پیش‌فرض ۳۰۰). */
-    val simDailyLimit: Int = 300
+    val sim2MessageText: String = ""
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -105,8 +111,11 @@ class SettingsRepository(private val context: Context) {
         val DUAL_SIM_ENABLED = booleanPreferencesKey("dual_sim_enabled")
         val SIM1_SUB_ID = intPreferencesKey("sim1_sub_id")
         val SIM2_SUB_ID = intPreferencesKey("sim2_sub_id")
+        val SIM1_ENABLED = booleanPreferencesKey("sim1_enabled")
+        val SIM2_ENABLED = booleanPreferencesKey("sim2_enabled")
+        val SIM1_LIMIT = intPreferencesKey("sim1_daily_limit")
+        val SIM2_LIMIT = intPreferencesKey("sim2_daily_limit")
         val SIM2_MESSAGE = stringPreferencesKey("sim2_message_text")
-        val SIM_DAILY_LIMIT = intPreferencesKey("sim_daily_limit")
         val OPTED_OUT = stringSetPreferencesKey("opted_out_numbers")
         val CYCLE_START = longPreferencesKey("cycle_start_at")
     }
@@ -136,8 +145,11 @@ class SettingsRepository(private val context: Context) {
             dualSimEnabled = p[Keys.DUAL_SIM_ENABLED] ?: false,
             sim1SubId = p[Keys.SIM1_SUB_ID] ?: -1,
             sim2SubId = p[Keys.SIM2_SUB_ID] ?: -1,
-            sim2MessageText = p[Keys.SIM2_MESSAGE] ?: "",
-            simDailyLimit = p[Keys.SIM_DAILY_LIMIT] ?: 300
+            sim1Enabled = p[Keys.SIM1_ENABLED] ?: true,
+            sim2Enabled = p[Keys.SIM2_ENABLED] ?: true,
+            sim1DailyLimit = p[Keys.SIM1_LIMIT] ?: 300,
+            sim2DailyLimit = p[Keys.SIM2_LIMIT] ?: 300,
+            sim2MessageText = p[Keys.SIM2_MESSAGE] ?: ""
         )
     }
 
@@ -168,8 +180,11 @@ class SettingsRepository(private val context: Context) {
             p[Keys.DUAL_SIM_ENABLED] = settings.dualSimEnabled
             p[Keys.SIM1_SUB_ID] = settings.sim1SubId
             p[Keys.SIM2_SUB_ID] = settings.sim2SubId
+            p[Keys.SIM1_ENABLED] = settings.sim1Enabled
+            p[Keys.SIM2_ENABLED] = settings.sim2Enabled
+            p[Keys.SIM1_LIMIT] = settings.sim1DailyLimit
+            p[Keys.SIM2_LIMIT] = settings.sim2DailyLimit
             p[Keys.SIM2_MESSAGE] = settings.sim2MessageText
-            p[Keys.SIM_DAILY_LIMIT] = settings.simDailyLimit
         }
     }
 

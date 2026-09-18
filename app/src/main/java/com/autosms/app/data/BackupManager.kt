@@ -56,8 +56,11 @@ object BackupManager {
         s.put("dualSimEnabled", settings.dualSimEnabled)
         s.put("sim1SubId", settings.sim1SubId)
         s.put("sim2SubId", settings.sim2SubId)
+        s.put("sim1Enabled", settings.sim1Enabled)
+        s.put("sim2Enabled", settings.sim2Enabled)
+        s.put("sim1DailyLimit", settings.sim1DailyLimit)
+        s.put("sim2DailyLimit", settings.sim2DailyLimit)
         s.put("sim2MessageText", settings.sim2MessageText)
-        s.put("simDailyLimit", settings.simDailyLimit)
         root.put("settings", s)
 
         val arr = JSONArray()
@@ -107,8 +110,12 @@ object BackupManager {
             dualSimEnabled = s.optBoolean("dualSimEnabled", false),
             sim1SubId = s.optInt("sim1SubId", -1),
             sim2SubId = s.optInt("sim2SubId", -1),
-            sim2MessageText = s.optString("sim2MessageText", ""),
-            simDailyLimit = s.optInt("simDailyLimit", 300)
+            sim1Enabled = s.optBoolean("sim1Enabled", true),
+            sim2Enabled = s.optBoolean("sim2Enabled", true),
+            // سازگاریِ عقب: اگر پشتیبانِ قدیمی فقط «simDailyLimit» مشترک داشت، همان را برای هر دو سیم می‌گیریم.
+            sim1DailyLimit = s.optInt("sim1DailyLimit", s.optInt("simDailyLimit", 300)),
+            sim2DailyLimit = s.optInt("sim2DailyLimit", s.optInt("simDailyLimit", 300)),
+            sim2MessageText = s.optString("sim2MessageText", "")
         )
 
         val customers = mutableListOf<Customer>()
