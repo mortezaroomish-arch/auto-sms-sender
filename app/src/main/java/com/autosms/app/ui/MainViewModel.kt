@@ -161,14 +161,52 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             val s = _settings.value
-            if (s.messageText.isBlank()) {
+            val app = getApplication<Application>()
+
+            // متنِ پایه: اولین متنِ هر بخش، با جایگزینیِ (نام) در صورتِ روشن‌بودنِ شخصی‌سازی.
+            fun firstVariant(raw: String): String =
+                MessageTemplates.variants(raw).firstOrNull() ?: raw.trim()
+            fun personalize(t: String): String =
+                if (s.personalizeWithName) t.replace("(نام)", "دوست").replace("{نام}", "دوست") else t
+
+            val mainText = personalize(firstVariant(s.messageText))
+            // متنِ سیمِ دوم؛ اگر خالی باشد، همان متنِ اصلی.
+            val sim2Text = if (s.sim2MessageText.isNotBlank()) personalize(firstVariant(s.sim2MessageText)) else mainText
+
+            // تعیینِ سیم‌های فعال (مثلِ منطقِ ارسالِ واقعی در SmsWorker).
+            val sims = withContext(Dispatchers.IO) { SimUtil.activeSims(app) }
+            val simControl = s.dualSimEnabled && sims.isNotEmpty()
+            val sim1SubId = if (simControl) SimUtil.resolveSubId(app, s.sim1SubId, fallbackSlot = 0) else -1
+            val sim2SubId = if (simControl) SimUtil.resolveSubId(app, s.sim2SubId, fallbackSlot = 1) else -1
+            val sim1On = simControl && s.sim1Enabled && sim1SubId >= 0
+            val sim2On = simControl && s.sim2Enabled && sim2SubId >= 0 && (sim2SubId != sim1SubId || !sim1On)
+
+            // فهرستِ ارسال‌های آزمایشی: (subId، متن، برچسب). طبقِ همان سیمی که کاربر انتخاب کرده.
+            val jobs: List<Triple<Int, String, String>> = when {
+                sim1On && sim2On -> listOf(
+                    Triple(sim1SubId, mainText, "سیم ۱"),
+                    Triple(sim2SubId, sim2Text, "سیم ۲")
+                )
+                sim1On -> listOf(Triple(sim1SubId, mainText, "سیم ۱"))
+                sim2On -> listOf(Triple(sim2SubId, sim2Text, "سیم ۲"))
+                else -> listOf(Triple(-1, mainText, "سیمِ پیش‌فرض"))
+            }
+
+            if (jobs.all { it.second.isBlank() }) {
                 _message.value = "متن پیامک خالی است."
                 return@launch
             }
-            val base = MessageTemplates.variants(s.messageText).firstOrNull() ?: s.messageText.trim()
-            val text = if (s.personalizeWithName) base.replace("(نام)", "دوست").replace("{نام}", "دوست") else base
-            val ok = withContext(Dispatchers.IO) { smsSender.send(phoneNumber, text) }
-            _message.value = if (ok) "پیامک آزمایشی ارسال شد." else "ارسال پیامک آزمایشی ناموفق بود."
+
+            val results = StringBuilder()
+            for (job in jobs) {
+                if (job.second.isBlank()) {
+                    results.append("${job.third}: متن خالی است.  ")
+                    continue
+                }
+                val ok = withContext(Dispatchers.IO) { smsSender.send(phoneNumber, job.second, job.first) }
+                results.append(if (ok) "${job.third}: ✓  " else "${job.third}: ✗  ")
+            }
+            _message.value = "پیامکِ آزمایشی — ${results.toString().trim()}"
         }
     }
 
