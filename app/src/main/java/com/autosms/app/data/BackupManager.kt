@@ -61,6 +61,7 @@ object BackupManager {
         s.put("sim1DailyLimit", settings.sim1DailyLimit)
         s.put("sim2DailyLimit", settings.sim2DailyLimit)
         s.put("sim2MessageText", settings.sim2MessageText)
+        s.put("autoPacing", settings.autoPacing)
         root.put("settings", s)
 
         val arr = JSONArray()
@@ -115,7 +116,8 @@ object BackupManager {
             // سازگاریِ عقب: اگر پشتیبانِ قدیمی فقط «simDailyLimit» مشترک داشت، همان را برای هر دو سیم می‌گیریم.
             sim1DailyLimit = s.optInt("sim1DailyLimit", s.optInt("simDailyLimit", 300)),
             sim2DailyLimit = s.optInt("sim2DailyLimit", s.optInt("simDailyLimit", 300)),
-            sim2MessageText = s.optString("sim2MessageText", "")
+            sim2MessageText = s.optString("sim2MessageText", ""),
+            autoPacing = s.optBoolean("autoPacing", false)
         )
 
         val customers = mutableListOf<Customer>()

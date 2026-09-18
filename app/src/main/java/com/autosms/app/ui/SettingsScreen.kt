@@ -765,27 +765,73 @@ fun SettingsScreen(
                         }
                         Spacer(Modifier.height(4.dp))
                         if (!numbersExpanded) {
-                            val delayText = if (settings.delayMaxSeconds > settings.delaySeconds) {
-                                "${settings.delaySeconds} تا ${settings.delayMaxSeconds}"
+                            if (settings.autoPacing) {
+                                Text(
+                                    "🧠 خودکار: ساعت ${settings.startHour} تا ${settings.endHour} — فاصله‌ها خودکار حساب می‌شوند.",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
                             } else {
-                                "${settings.delaySeconds}"
+                                val delayText = if (settings.delayMaxSeconds > settings.delaySeconds) {
+                                    "${settings.delaySeconds} تا ${settings.delayMaxSeconds}"
+                                } else {
+                                    "${settings.delaySeconds}"
+                                }
+                                Text(
+                                    "تعداد: ${settings.dailyCount}  •  ساعت: ${settings.startHour} تا ${settings.endHour}  •  فاصله: $delayText ثانیه",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
                             }
-                            Text(
-                                "تعداد: ${settings.dailyCount}  •  ساعت: ${settings.startHour} تا ${settings.endHour}  •  فاصله: $delayText ثانیه",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
                             Text(
                                 "برای تغییر، «تغییر» را بزن.",
                                 style = MaterialTheme.typography.bodySmall
                             )
                         } else {
-                            SliderField(
-                                label = "تعداد ارسال در هر روز",
-                                value = settings.dailyCount,
-                                min = 1,
-                                max = 600,
-                                onValueChange = { v -> viewModel.updateSettings { it.copy(dailyCount = v) } }
+                            // کلیدِ «تنظیمِ خودکارِ فاصله»
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("🧠 تنظیمِ خودکارِ فاصله", style = MaterialTheme.typography.titleSmall)
+                                Switch(
+                                    checked = settings.autoPacing,
+                                    onCheckedChange = { c -> viewModel.updateSettings { it.copy(autoPacing = c) } }
+                                )
+                            }
+                            Text(
+                                "روشن: خودِ برنامه فاصله‌ها را حساب می‌کند تا تعدادِ کل، در بازهٔ ساعت پخش شود (فاصلهٔ متغیر و طبیعی).",
+                                style = MaterialTheme.typography.bodySmall
                             )
+                            Spacer(Modifier.height(12.dp))
+
+                            // تعدادِ مؤثر: در حالتِ خودکار + کنترلِ سیم، تعداد = جمعِ سقفِ سیم‌های روشن.
+                            val simControlOn = settings.dualSimEnabled
+                            val simTotal = (if (settings.sim1Enabled) settings.sim1DailyLimit else 0) +
+                                (if (settings.sim2Enabled) settings.sim2DailyLimit else 0)
+                            val totalFromSims = settings.autoPacing && simControlOn &&
+                                (settings.sim1Enabled || settings.sim2Enabled)
+                            val effectiveTotal = if (totalFromSims) simTotal else settings.dailyCount
+
+                            if (totalFromSims) {
+                                Text(
+                                    "تعدادِ کل: $effectiveTotal پیام (خودکار از سقفِ سیم‌ها)",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    "= سیم۱ (${if (settings.sim1Enabled) settings.sim1DailyLimit else 0}) + سیم۲ (${if (settings.sim2Enabled) settings.sim2DailyLimit else 0})",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                Spacer(Modifier.height(8.dp))
+                            } else {
+                                SliderField(
+                                    label = "تعداد ارسال در هر روز",
+                                    value = settings.dailyCount,
+                                    min = 1,
+                                    max = 600,
+                                    onValueChange = { v -> viewModel.updateSettings { it.copy(dailyCount = v) } }
+                                )
+                            }
+
                             SliderField(
                                 label = "ساعت شروع",
                                 value = settings.startHour,
@@ -800,24 +846,45 @@ fun SettingsScreen(
                                 max = 23,
                                 onValueChange = { v -> viewModel.updateSettings { it.copy(endHour = v) } }
                             )
-                            SliderField(
-                                label = "فاصله بین پیام‌ها (ثانیه)",
-                                value = settings.delaySeconds,
-                                min = 5,
-                                max = 300,
-                                onValueChange = { v -> viewModel.updateSettings { it.copy(delaySeconds = v) } }
-                            )
-                            SliderField(
-                                label = "حداکثرِ فاصله (ثانیه) — ۰ یعنی ثابت",
-                                value = settings.delayMaxSeconds,
-                                min = 0,
-                                max = 300,
-                                onValueChange = { v -> viewModel.updateSettings { it.copy(delayMaxSeconds = v) } }
-                            )
-                            Text(
-                                "اگر بزرگ‌تر از «فاصله» باشد، فاصلهٔ ارسال تصادفی می‌شود (طبیعی‌تر).",
-                                style = MaterialTheme.typography.bodySmall
-                            )
+
+                            if (settings.autoPacing) {
+                                // پیش‌نمایشِ محاسبه‌ی خودکار
+                                val windowHours = settings.endHour - settings.startHour
+                                if (windowHours <= 0) {
+                                    Text(
+                                        "⚠️ ساعتِ پایان باید بزرگ‌تر از ساعتِ شروع باشد.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color(0xFFB00020)
+                                    )
+                                } else if (effectiveTotal > 1) {
+                                    val gap = (windowHours * 3600) / effectiveTotal
+                                    val gapMin = gap / 60
+                                    val gapText = if (gapMin >= 1) "$gap ثانیه (≈ $gapMin دقیقه)" else "$gap ثانیه"
+                                    Text(
+                                        "پیش‌بینی: هر ≈ $gapText یک پیام، تا $effectiveTotal پیام در بازهٔ ${settings.startHour} تا ${settings.endHour} پخش شود.",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            } else {
+                                SliderField(
+                                    label = "فاصله بین پیام‌ها (ثانیه)",
+                                    value = settings.delaySeconds,
+                                    min = 5,
+                                    max = 300,
+                                    onValueChange = { v -> viewModel.updateSettings { it.copy(delaySeconds = v) } }
+                                )
+                                SliderField(
+                                    label = "حداکثرِ فاصله (ثانیه) — ۰ یعنی ثابت",
+                                    value = settings.delayMaxSeconds,
+                                    min = 0,
+                                    max = 300,
+                                    onValueChange = { v -> viewModel.updateSettings { it.copy(delayMaxSeconds = v) } }
+                                )
+                                Text(
+                                    "اگر بزرگ‌تر از «فاصله» باشد، فاصلهٔ ارسال تصادفی می‌شود (طبیعی‌تر).",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
                         }
                     }
                 }

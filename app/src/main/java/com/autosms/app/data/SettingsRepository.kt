@@ -77,7 +77,14 @@ data class AppSettings(
     /** بیشترین تعدادِ پیامک از سیمِ دوم در هر اجرا (حدِ مجازِ اپراتور؛ پیش‌فرض ۳۰۰). */
     val sim2DailyLimit: Int = 300,
     /** متنِ مخصوصِ سیمِ دوم. اگر خالی باشد، همان متنِ اصلی برای سیمِ دوم استفاده می‌شود. */
-    val sim2MessageText: String = ""
+    val sim2MessageText: String = "",
+    /**
+     * تنظیمِ خودکارِ فاصله: اگر روشن باشد، برنامه خودش فاصلهٔ بینِ پیام‌ها را حساب می‌کند تا
+     * تعدادِ موردِ نظر دقیقاً در بازهٔ ساعتِ شروع تا پایان پخش شود (با فاصلهٔ متغیر و طبیعی).
+     * در این حالت، «تعدادِ ارسال در روز» و «فاصله‌»های دستی نادیده گرفته می‌شوند و به‌جای آن
+     * تعداد = جمعِ سقفِ سیم‌های روشن است.
+     */
+    val autoPacing: Boolean = false
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -116,6 +123,7 @@ class SettingsRepository(private val context: Context) {
         val SIM1_LIMIT = intPreferencesKey("sim1_daily_limit")
         val SIM2_LIMIT = intPreferencesKey("sim2_daily_limit")
         val SIM2_MESSAGE = stringPreferencesKey("sim2_message_text")
+        val AUTO_PACING = booleanPreferencesKey("auto_pacing")
         val OPTED_OUT = stringSetPreferencesKey("opted_out_numbers")
         val CYCLE_START = longPreferencesKey("cycle_start_at")
     }
@@ -149,7 +157,8 @@ class SettingsRepository(private val context: Context) {
             sim2Enabled = p[Keys.SIM2_ENABLED] ?: true,
             sim1DailyLimit = p[Keys.SIM1_LIMIT] ?: 300,
             sim2DailyLimit = p[Keys.SIM2_LIMIT] ?: 300,
-            sim2MessageText = p[Keys.SIM2_MESSAGE] ?: ""
+            sim2MessageText = p[Keys.SIM2_MESSAGE] ?: "",
+            autoPacing = p[Keys.AUTO_PACING] ?: false
         )
     }
 
@@ -185,6 +194,7 @@ class SettingsRepository(private val context: Context) {
             p[Keys.SIM1_LIMIT] = settings.sim1DailyLimit
             p[Keys.SIM2_LIMIT] = settings.sim2DailyLimit
             p[Keys.SIM2_MESSAGE] = settings.sim2MessageText
+            p[Keys.AUTO_PACING] = settings.autoPacing
         }
     }
 

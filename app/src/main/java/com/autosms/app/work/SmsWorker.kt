@@ -132,6 +132,15 @@ class SmsWorker(
             var sentSim1 = 0
             var sentSim2 = 0
 
+            // تعدادِ هدف برای این اجرا:
+            //  - حالتِ خودکار (autoPacing) + کنترلِ سیم: تعداد = جمعِ سقفِ سیم‌های روشن (مثلاً ۲۰۰+۳۰۰=۵۰۰).
+            //  - در غیرِ این‌صورت: همان «تعدادِ ارسال در روز».
+            val target = if (settings.autoPacing && (sim1On || sim2On)) {
+                (if (sim1On) cap1 else 0) + (if (sim2On) cap2 else 0)
+            } else {
+                settings.dailyCount
+            }.coerceAtLeast(0)
+
             // مرتب‌سازی «بر اساسِ نامِ الفباییِ فارسی» به‌عنوانِ کلیدِ اصلی (نه تاریخِ ارسال)،
             // با پاک‌کردنِ پیشوندِ «دکتر» تا احمد زیرِ «الف» بیاید نه «د». هم‌نام‌ها با شماره
             // مرتب می‌شوند تا ترتیب پایدار بماند.
@@ -141,10 +150,16 @@ class SmsWorker(
                     Comparator<Customer> { a, b -> faCollator.compare(nameSortKey(a.name), nameSortKey(b.name)) }
                         .thenBy { it.phoneNumber }
                 )
-                .take(settings.dailyCount)
+                .take(target)
 
             val minDelay = settings.delaySeconds.coerceAtLeast(1)
             val maxDelay = settings.delayMaxSeconds
+
+            // فاصلهٔ پایه برای حالتِ خودکار: کلِ بازهٔ زمانی (ساعتِ شروع تا پایان) تقسیم بر تعدادِ پیام‌ها.
+            // این‌طور پیام‌ها دقیقاً در همان بازه پخش می‌شوند. اگر بازه نامعتبر بود، خودکار خاموش می‌ماند.
+            val windowSeconds = (settings.endHour - settings.startHour).coerceAtLeast(0) * 3600
+            val autoPacingActive = settings.autoPacing && windowSeconds > 0 && due.size > 1
+            val pacingBase = if (autoPacingActive) (windowSeconds / due.size).coerceAtLeast(1) else 0
 
             for ((index, customer) in due.withIndex()) {
                 if (!manual && isPastEndHour(settings.endHour)) break
@@ -196,12 +211,19 @@ class SmsWorker(
                 setForegroundSafe(index + 1, due.size)
 
                 if (index < due.size - 1) {
-                    // وقتی هر دو سیم فعال‌اند فاصله نصف می‌شود: چون بارِ ارسال بین دو سیم پخش می‌شود،
-                    // فاصلهٔ هر سیم با پیامِ بعدیِ خودش ≈ مقدارِ تنظیم‌شده می‌ماند، ولی سرعتِ کل دوبرابر.
-                    val loMin = if (bothOn) (minDelay / 2).coerceAtLeast(1) else minDelay
-                    val loMax = if (bothOn) (maxDelay / 2) else maxDelay
-                    // فاصلهٔ تصادفی بینِ حداقل و حداکثر (اگر حداکثر بزرگ‌تر باشد)؛ وگرنه ثابت.
-                    val seconds = if (loMax > loMin) (loMin..loMax).random() else loMin
+                    val seconds = if (autoPacingActive) {
+                        // حالتِ خودکار: فاصلهٔ متغیرِ تصادفی حولِ فاصلهٔ پایه (۶۰٪ تا ۱۳۰٪) تا هم یکنواخت
+                        // نباشد و هم به‌طورِ میانگین کمی زودتر از پایانِ بازه تمام شود (حاشیهٔ امنیت).
+                        val lo = (pacingBase * 6 / 10).coerceAtLeast(1)
+                        val hi = (pacingBase * 13 / 10).coerceAtLeast(lo)
+                        if (hi > lo) (lo..hi).random() else pacingBase
+                    } else {
+                        // حالتِ دستی: وقتی هر دو سیم فعال‌اند فاصله نصف می‌شود (سرعتِ کل دوبرابر، فاصلهٔ هر
+                        // سیم با خودش ≈ مقدارِ تنظیم‌شده). وگرنه همان فاصلهٔ تصادفیِ حداقل/حداکثر.
+                        val loMin = if (bothOn) (minDelay / 2).coerceAtLeast(1) else minDelay
+                        val loMax = if (bothOn) (maxDelay / 2) else maxDelay
+                        if (loMax > loMin) (loMin..loMax).random() else loMin
+                    }
                     delay(seconds * 1000L)
                 }
             }
