@@ -553,7 +553,7 @@ fun SettingsScreen(
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "پیام‌ها یکی‌درمیان بینِ دو سیم فرستاده می‌شوند تا بتوانی بیش از حدِ روزانه‌ی یک سیم پیامک بدهی.",
+                            "هر سیم را جداگانه کنترل کن: روشن/خاموش، سقفِ جدا و متنِ جدا. هر دو روشن باشند، پیام‌ها یکی‌درمیان از دو سیم می‌روند تا بتوانی بیش از حدِ یک سیم بفرستی.",
                             style = MaterialTheme.typography.bodySmall
                         )
 
@@ -583,15 +583,77 @@ fun SettingsScreen(
                                 else -> {
                                     val sim1 = availableSims.firstOrNull { it.subscriptionId == settings.sim1SubId }
                                     val sim2 = availableSims.firstOrNull { it.subscriptionId == settings.sim2SubId }
-                                    Text(
-                                        "① سیمِ اول: ${sim1?.label ?: "—"}",
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                    Text(
-                                        "② سیمِ دوم: ${sim2?.label ?: "—"}",
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                    Spacer(Modifier.height(8.dp))
+
+                                    // ---- سیمِ اول ----
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            "① سیمِ اول: ${sim1?.label ?: "—"}",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Switch(
+                                            checked = settings.sim1Enabled,
+                                            onCheckedChange = { c -> viewModel.updateSettings { it.copy(sim1Enabled = c) } }
+                                        )
+                                    }
+                                    if (settings.sim1Enabled) {
+                                        SliderField(
+                                            label = "سقفِ سیمِ اول در روز",
+                                            value = settings.sim1DailyLimit,
+                                            min = 1,
+                                            max = 500,
+                                            onValueChange = { v -> viewModel.updateSettings { it.copy(sim1DailyLimit = v) } }
+                                        )
+                                        Text(
+                                            "متنِ سیمِ اول = همان «متن‌های پیامک» بالا.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+
+                                    Spacer(Modifier.height(12.dp))
+                                    Divider()
+                                    Spacer(Modifier.height(12.dp))
+
+                                    // ---- سیمِ دوم ----
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            "② سیمِ دوم: ${sim2?.label ?: "—"}",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Switch(
+                                            checked = settings.sim2Enabled,
+                                            onCheckedChange = { c -> viewModel.updateSettings { it.copy(sim2Enabled = c) } }
+                                        )
+                                    }
+                                    if (settings.sim2Enabled) {
+                                        SliderField(
+                                            label = "سقفِ سیمِ دوم در روز",
+                                            value = settings.sim2DailyLimit,
+                                            min = 1,
+                                            max = 500,
+                                            onValueChange = { v -> viewModel.updateSettings { it.copy(sim2DailyLimit = v) } }
+                                        )
+                                        Spacer(Modifier.height(8.dp))
+                                        OutlinedTextField(
+                                            value = settings.sim2MessageText,
+                                            onValueChange = { text -> viewModel.updateSettings { it.copy(sim2MessageText = text) } },
+                                            label = { Text("متنِ سیمِ دوم (خالی = مثلِ متنِ اصلی)") },
+                                            placeholder = { Text("متنِ مخصوصِ سیمِ دوم را این‌جا بنویس") },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            minLines = 2
+                                        )
+                                    }
+
+                                    Spacer(Modifier.height(12.dp))
                                     OutlinedButton(onClick = {
                                         viewModel.updateSettings {
                                             it.copy(sim1SubId = it.sim2SubId, sim2SubId = it.sim1SubId)
@@ -600,30 +662,9 @@ fun SettingsScreen(
                                         Text("🔁 جابه‌جاییِ سیمِ اول و دوم")
                                     }
 
-                                    Spacer(Modifier.height(12.dp))
-                                    SliderField(
-                                        label = "سقفِ هر سیم در روز",
-                                        value = settings.simDailyLimit,
-                                        min = 1,
-                                        max = 500,
-                                        onValueChange = { v -> viewModel.updateSettings { it.copy(simDailyLimit = v) } }
-                                    )
+                                    Spacer(Modifier.height(8.dp))
                                     Text(
-                                        "هر سیم حداکثر همین تعداد می‌فرستد (حدِ مجازِ اپراتور). با دو سیم می‌توانی تا دو برابر بفرستی؛ «تعدادِ ارسال در روز» را هم به‌اندازه بالا ببر.",
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-
-                                    Spacer(Modifier.height(12.dp))
-                                    OutlinedTextField(
-                                        value = settings.sim2MessageText,
-                                        onValueChange = { text -> viewModel.updateSettings { it.copy(sim2MessageText = text) } },
-                                        label = { Text("متنِ سیمِ دوم (خالی = مثلِ متنِ اصلی)") },
-                                        placeholder = { Text("متنِ مخصوصِ سیمِ دوم را این‌جا بنویس") },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        minLines = 2
-                                    )
-                                    Text(
-                                        "پیام‌هایی که از سیمِ اول می‌روند، متنِ اصلیِ بالا را می‌گیرند؛ پیام‌های سیمِ دوم، این متن را.",
+                                        "هر دو روشن = پیام‌ها یکی‌درمیان از هر دو سیم. فقط یکی روشن = همه از همان سیم. هر سیم تا سقفِ خودش می‌فرستد.",
                                         style = MaterialTheme.typography.bodySmall
                                     )
                                 }
