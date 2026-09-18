@@ -67,6 +67,17 @@ object SimUtil {
     fun isDualSim(context: Context): Boolean = activeSims(context).size >= 2
 
     /**
+     * شناسه‌ی سیمِ پیش‌فرضِ پیامکِ گوشی (همانی که برنامهٔ پیامکِ خودِ گوشی از آن می‌فرستد).
+     * برای عیب‌یابی مفید است: اگر پیام از این سیم رفت یعنی انتخابِ سیمِ ما اثر نکرده.
+     * در صورتِ خطا ‑۱ برمی‌گرداند.
+     */
+    fun defaultSmsSubId(context: Context): Int = try {
+        SubscriptionManager.getDefaultSmsSubscriptionId()
+    } catch (e: Exception) {
+        -1
+    }
+
+    /**
      * شناسه‌ی سیمِ انتخاب‌شده را اعتبارسنجی می‌کند: اگر subId ذخیره‌شده هنوز فعال باشد
      * همان برمی‌گردد، وگرنه سیمِ جایگاهِ داده‌شده (fallbackSlot) به‌عنوانِ پیش‌فرض.
      * اگر هیچ‌کدام نبود، ‑۱ (یعنی سیمِ پیش‌فرضِ سیستم).

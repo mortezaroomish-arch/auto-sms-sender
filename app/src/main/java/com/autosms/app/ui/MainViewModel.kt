@@ -81,6 +81,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _availableSims = MutableStateFlow<List<SimUtil.SimInfo>>(emptyList())
     val availableSims: StateFlow<List<SimUtil.SimInfo>> = _availableSims.asStateFlow()
 
+    /** متنِ عیب‌یابیِ سیم‌کارت‌ها برای نمایش در دیالوگ (null = بسته). */
+    private val _simInfo = MutableStateFlow<String?>(null)
+    val simInfo: StateFlow<String?> = _simInfo.asStateFlow()
+
     init {
         viewModelScope.launch {
             _settings.value = settingsRepo.current()
@@ -116,6 +120,39 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun updateSettings(update: (AppSettings) -> AppSettings) {
         _settings.value = update(_settings.value)
+    }
+
+    /** ساختِ گزارشِ عیب‌یابیِ سیم‌کارت‌ها و نمایش در دیالوگ. */
+    fun showSimInfo() {
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val sb = StringBuilder()
+            val granted = SimUtil.hasPermission(app)
+            sb.append("مجوزِ تلفن: ${if (granted) "دارد ✓" else "ندارد ✗ (برای دیدن سیم‌ها لازم است)"}\n\n")
+
+            val sims = withContext(Dispatchers.IO) { SimUtil.activeSims(app) }
+            sb.append("سیم‌های فعالِ گوشی: ${sims.size}\n")
+            for (s in sims) {
+                sb.append("• جایگاه ${s.slotIndex + 1} | شناسه(subId)=${s.subscriptionId}\n   ${s.label}\n")
+            }
+            sb.append("\n")
+
+            val def = withContext(Dispatchers.IO) { SimUtil.defaultSmsSubId(app) }
+            sb.append("سیمِ پیش‌فرضِ پیامکِ گوشی: subId=$def\n\n")
+
+            val st = _settings.value
+            sb.append("تنظیماتِ برنامه:\n")
+            sb.append("• کنترلِ سیم: ${if (st.dualSimEnabled) "روشن" else "خاموش"}\n")
+            sb.append("• سیم ۱: subId=${st.sim1SubId} — ${if (st.sim1Enabled) "روشن" else "خاموش"}\n")
+            sb.append("• سیم ۲: subId=${st.sim2SubId} — ${if (st.sim2Enabled) "روشن" else "خاموش"}\n\n")
+            sb.append("راهنما: وقتی تست می‌فرستی، اگر پیام از «subId»ِ سیمِ انتخابیت برود درست است؛ اگر از «سیمِ پیش‌فرض» برود یعنی گوشی انتخابِ ما را نادیده گرفته.")
+
+            _simInfo.value = sb.toString()
+        }
+    }
+
+    fun clearSimInfo() {
+        _simInfo.value = null
     }
 
     fun save() {
@@ -199,12 +236,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
             val results = StringBuilder()
             for (job in jobs) {
+                val subLabel = if (job.first >= 0) "${job.third} (subId=${job.first})" else job.third
                 if (job.second.isBlank()) {
-                    results.append("${job.third}: متن خالی است.  ")
+                    results.append("$subLabel: متن خالی است.  ")
                     continue
                 }
                 val ok = withContext(Dispatchers.IO) { smsSender.send(phoneNumber, job.second, job.first) }
-                results.append(if (ok) "${job.third}: ✓  " else "${job.third}: ✗  ")
+                results.append(if (ok) "$subLabel: ✓  " else "$subLabel: ✗  ")
             }
             _message.value = "پیامکِ آزمایشی — ${results.toString().trim()}"
         }

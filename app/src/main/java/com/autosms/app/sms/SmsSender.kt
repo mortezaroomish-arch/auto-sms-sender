@@ -17,22 +17,19 @@ class SmsSender(private val context: Context) {
         }
 
     /**
-     * SmsManagerِ مربوط به یک سیمِ مشخص (بر اساسِ subscriptionId). اگر subId منفی باشد،
-     * یا در تهیه‌ی managerِ اختصاصی خطایی رخ دهد، به سیمِ پیش‌فرضِ سیستم برمی‌گردد.
+     * SmsManagerِ مربوط به یک سیمِ مشخص (بر اساسِ subscriptionId).
+     *
+     * ⚠️ برخلافِ قبل، اگر ساختِ managerِ اختصاصی ممکن نباشد، **به سیمِ پیش‌فرض برنمی‌گردیم**
+     * بلکه استثنا پرتاب می‌شود؛ این‌طور اگر ارسال از سیمِ انتخابی ممکن نباشد، به‌جای اینکه
+     * بی‌سروصدا از سیمِ پیش‌فرض برود و «موفق» گزارش شود، صادقانه شکست گزارش می‌شود.
      */
     private fun managerForSubscription(subscriptionId: Int): SmsManager {
-        if (subscriptionId < 0) return smsManager
-        return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                context.getSystemService(SmsManager::class.java)
-                    .createForSubscriptionId(subscriptionId)
-            } else {
-                @Suppress("DEPRECATION")
-                SmsManager.getSmsManagerForSubscriptionId(subscriptionId)
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "تهیه‌ی SmsManager برای سیم $subscriptionId ناموفق بود؛ سیمِ پیش‌فرض استفاده می‌شود.", e)
-            smsManager
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            context.getSystemService(SmsManager::class.java)
+                .createForSubscriptionId(subscriptionId)
+        } else {
+            @Suppress("DEPRECATION")
+            SmsManager.getSmsManagerForSubscriptionId(subscriptionId)
         }
     }
 
@@ -49,7 +46,7 @@ class SmsSender(private val context: Context) {
                 Log.e(TAG, "شماره نامعتبر است: '$phoneNumber'")
                 return false
             }
-            val manager = managerForSubscription(subscriptionId)
+            val manager = if (subscriptionId < 0) smsManager else managerForSubscription(subscriptionId)
             val parts = manager.divideMessage(message)
             if (parts.size > 1) {
                 manager.sendMultipartTextMessage(number, null, parts, null, null)

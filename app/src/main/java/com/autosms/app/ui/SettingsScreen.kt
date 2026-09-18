@@ -74,6 +74,7 @@ fun SettingsScreen(
     val message by viewModel.message.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val availableSims by viewModel.availableSims.collectAsStateWithLifecycle()
+    val simInfo by viewModel.simInfo.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
     var testNumber by rememberSaveable { mutableStateOf("") }
@@ -124,6 +125,17 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showResetDialog = false }) { Text("انصراف") }
+            }
+        )
+    }
+
+    if (simInfo != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.clearSimInfo() },
+            title = { Text("🔎 اطلاعاتِ سیم‌کارت‌ها") },
+            text = { Text(simInfo ?: "", style = MaterialTheme.typography.bodyMedium) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearSimInfo() }) { Text("بستن") }
             }
         )
     }
@@ -556,6 +568,10 @@ fun SettingsScreen(
                             "هر سیم را جداگانه کنترل کن: روشن/خاموش، سقفِ جدا و متنِ جدا. هر دو روشن باشند، پیام‌ها یکی‌درمیان از دو سیم می‌روند تا بتوانی بیش از حدِ یک سیم بفرستی.",
                             style = MaterialTheme.typography.bodySmall
                         )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(onClick = { viewModel.showSimInfo() }) {
+                            Text("🔎 اطلاعاتِ سیم‌کارت‌ها")
+                        }
 
                         if (settings.dualSimEnabled) {
                             Spacer(Modifier.height(12.dp))
