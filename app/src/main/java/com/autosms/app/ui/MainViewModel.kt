@@ -14,6 +14,7 @@ import com.autosms.app.data.AppSettings
 import com.autosms.app.data.BackupManager
 import com.autosms.app.data.Customer
 import com.autosms.app.data.SettingsRepository
+import com.autosms.app.sms.SimUtil
 import com.autosms.app.sms.SmsSender
 import com.autosms.app.util.JalaliDate
 import com.autosms.app.util.MessageTemplates
@@ -76,11 +77,40 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
 
+    /** فهرستِ سیم‌کارت‌های فعالِ دستگاه (برای حالتِ دو سیم‌کارت). */
+    private val _availableSims = MutableStateFlow<List<SimUtil.SimInfo>>(emptyList())
+    val availableSims: StateFlow<List<SimUtil.SimInfo>> = _availableSims.asStateFlow()
+
     init {
         viewModelScope.launch {
             _settings.value = settingsRepo.current()
             refreshStats()
             searchContacts()
+            loadSims()
+        }
+    }
+
+    /**
+     * خواندنِ سیم‌کارت‌های فعالِ دستگاه. اگر مجوزِ READ_PHONE_STATE داده شده باشد و دستگاه
+     * دو سیم داشته باشد، در حالتِ دو سیم‌کارت قابلِ انتخاب می‌شوند. در صورتِ نبودِ انتخابِ
+     * قبلی، به‌صورتِ خودکار سیمِ جایگاهِ ۱ و ۲ به‌عنوانِ پیش‌فرض ذخیره می‌شوند.
+     */
+    fun loadSims() {
+        viewModelScope.launch {
+            val sims = withContext(Dispatchers.IO) { SimUtil.activeSims(getApplication<Application>()) }
+            _availableSims.value = sims
+            if (sims.size >= 2) {
+                val s = _settings.value
+                val validIds = sims.map { it.subscriptionId }.toSet()
+                if (s.sim1SubId !in validIds || s.sim2SubId !in validIds || s.sim1SubId == s.sim2SubId) {
+                    updateSettings {
+                        it.copy(
+                            sim1SubId = sims[0].subscriptionId,
+                            sim2SubId = sims[1].subscriptionId
+                        )
+                    }
+                }
+            }
         }
     }
 

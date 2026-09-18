@@ -57,7 +57,21 @@ data class AppSettings(
     /** پیامک برای تماسِ بی‌پاسخ: اگر روشن باشد، وقتی تماسی بی‌پاسخ بماند به تماس‌گیرنده پیامک می‌رود. */
     val missedCallReplyEnabled: Boolean = false,
     /** متنی که برای تماسِ بی‌پاسخ فرستاده می‌شود. */
-    val missedCallReplyText: String = "در اسرع وقت با شما تماس می‌گیرم"
+    val missedCallReplyText: String = "در اسرع وقت با شما تماس می‌گیرم",
+    /**
+     * حالتِ دو سیم‌کارت: اگر روشن باشد، پیامک‌های روزانه به‌صورتِ یکی‌درمیان بینِ دو سیم
+     * پخش می‌شوند (تا سقفِ [simDailyLimit] برای هر سیم) تا بتوان بیش از حدِ روزانه‌ی
+     * یک سیم پیامک فرستاد.
+     */
+    val dualSimEnabled: Boolean = false,
+    /** شناسه‌ی سیستمیِ سیمِ اول (‑۱ = سیمِ جایگاهِ ۱ به‌صورتِ خودکار). */
+    val sim1SubId: Int = -1,
+    /** شناسه‌ی سیستمیِ سیمِ دوم (‑۱ = سیمِ جایگاهِ ۲ به‌صورتِ خودکار). */
+    val sim2SubId: Int = -1,
+    /** متنِ مخصوصِ سیمِ دوم. اگر خالی باشد، همان متنِ اصلی برای سیمِ دوم استفاده می‌شود. */
+    val sim2MessageText: String = "",
+    /** بیشترین تعدادِ پیامک از هر سیم در هر اجرا (حدِ مجازِ اپراتور؛ پیش‌فرض ۳۰۰). */
+    val simDailyLimit: Int = 300
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -88,6 +102,11 @@ class SettingsRepository(private val context: Context) {
         val MISSED_CALL_ENABLED = booleanPreferencesKey("missed_call_enabled")
         val MISSED_CALL_TEXT = stringPreferencesKey("missed_call_text")
         val MISSED_CALL_LOG = stringSetPreferencesKey("missed_call_log")
+        val DUAL_SIM_ENABLED = booleanPreferencesKey("dual_sim_enabled")
+        val SIM1_SUB_ID = intPreferencesKey("sim1_sub_id")
+        val SIM2_SUB_ID = intPreferencesKey("sim2_sub_id")
+        val SIM2_MESSAGE = stringPreferencesKey("sim2_message_text")
+        val SIM_DAILY_LIMIT = intPreferencesKey("sim_daily_limit")
         val OPTED_OUT = stringSetPreferencesKey("opted_out_numbers")
         val CYCLE_START = longPreferencesKey("cycle_start_at")
     }
@@ -113,7 +132,12 @@ class SettingsRepository(private val context: Context) {
             autoReplyDefault = p[Keys.AUTO_REPLY_DEFAULT] ?: "",
             autoReplyRules = p[Keys.AUTO_REPLY_RULES] ?: "",
             missedCallReplyEnabled = p[Keys.MISSED_CALL_ENABLED] ?: false,
-            missedCallReplyText = p[Keys.MISSED_CALL_TEXT] ?: "در اسرع وقت با شما تماس می‌گیرم"
+            missedCallReplyText = p[Keys.MISSED_CALL_TEXT] ?: "در اسرع وقت با شما تماس می‌گیرم",
+            dualSimEnabled = p[Keys.DUAL_SIM_ENABLED] ?: false,
+            sim1SubId = p[Keys.SIM1_SUB_ID] ?: -1,
+            sim2SubId = p[Keys.SIM2_SUB_ID] ?: -1,
+            sim2MessageText = p[Keys.SIM2_MESSAGE] ?: "",
+            simDailyLimit = p[Keys.SIM_DAILY_LIMIT] ?: 300
         )
     }
 
@@ -141,6 +165,11 @@ class SettingsRepository(private val context: Context) {
             p[Keys.AUTO_REPLY_RULES] = settings.autoReplyRules
             p[Keys.MISSED_CALL_ENABLED] = settings.missedCallReplyEnabled
             p[Keys.MISSED_CALL_TEXT] = settings.missedCallReplyText
+            p[Keys.DUAL_SIM_ENABLED] = settings.dualSimEnabled
+            p[Keys.SIM1_SUB_ID] = settings.sim1SubId
+            p[Keys.SIM2_SUB_ID] = settings.sim2SubId
+            p[Keys.SIM2_MESSAGE] = settings.sim2MessageText
+            p[Keys.SIM_DAILY_LIMIT] = settings.simDailyLimit
         }
     }
 

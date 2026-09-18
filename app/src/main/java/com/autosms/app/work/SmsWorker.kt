@@ -14,6 +14,7 @@ import com.autosms.app.data.AppSettings
 import com.autosms.app.data.AppDatabase
 import com.autosms.app.data.Customer
 import com.autosms.app.data.SettingsRepository
+import com.autosms.app.sms.SimUtil
 import com.autosms.app.sms.SmsSender
 import com.autosms.app.util.MessageTemplates
 import com.autosms.app.util.PhoneUtil
@@ -102,13 +103,25 @@ class SmsWorker(
             //  - اگر «ترتیبی» روشن باشد و چند متن باشد: متنِ این دوره بر اساسِ شمارهٔ دوره
             //    (هر دوره متنِ بعدی؛ پس تکراری فرستاده نمی‌شود).
             //  - در غیرِ این‌صورت: همیشه متنِ پیش‌فرض (اولین متن) فرستاده می‌شود.
-            val variants = MessageTemplates.variants(settings.messageText)
-            val messageForCycle: String =
-                if (settings.sequentialMessages && variants.size > 1) {
-                    variants[settingsRepo.currentCycleMessageIndex() % variants.size]
-                } else {
-                    variants.firstOrNull() ?: settings.messageText.trim()
-                }
+            val cycleMessageIndex = settingsRepo.currentCycleMessageIndex()
+            val messageForCycle = pickMessage(settings.messageText, settings, cycleMessageIndex)
+
+            // ---- آماده‌سازیِ حالتِ دو سیم‌کارت ----
+            // اگر روشن باشد و دستگاه دو سیمِ فعال داشته باشد، دو subId جدا و متنِ سیمِ دوم
+            // را آماده می‌کنیم. اگر متنِ سیمِ دوم خالی باشد، همان متنِ اصلی استفاده می‌شود.
+            val sims = SimUtil.activeSims(context)
+            val dualSim = settings.dualSimEnabled && sims.size >= 2
+            val sim1SubId = if (dualSim) SimUtil.resolveSubId(context, settings.sim1SubId, fallbackSlot = 0) else -1
+            val sim2SubId = if (dualSim) SimUtil.resolveSubId(context, settings.sim2SubId, fallbackSlot = 1) else -1
+            val messageForSim2: String =
+                if (settings.sim2MessageText.isNotBlank())
+                    pickMessage(settings.sim2MessageText, settings, cycleMessageIndex)
+                else messageForCycle
+            // سقفِ هر سیم؛ اگر دو subId یکسان شدند (خطای انتخاب)، حالتِ دو سیم را خاموش می‌کنیم.
+            val simLimit = settings.simDailyLimit.coerceAtLeast(1)
+            val useDualSim = dualSim && sim1SubId != sim2SubId
+            var sentSim1 = 0
+            var sentSim2 = 0
 
             // مرتب‌سازی «بر اساسِ نامِ الفباییِ فارسی» به‌عنوانِ کلیدِ اصلی (نه تاریخِ ارسال)،
             // با پاک‌کردنِ پیشوندِ «دکتر» تا احمد زیرِ «الف» بیاید نه «د». هم‌نام‌ها با شماره
@@ -127,19 +140,45 @@ class SmsWorker(
             for ((index, customer) in due.withIndex()) {
                 if (!manual && isPastEndHour(settings.endHour)) break
 
-                val text = buildMessage(settings, customer, messageForCycle)
-                val ok = smsSender.send(customer.phoneNumber, text)
+                // انتخابِ سیم برای این پیام (حالتِ دو سیم = یکی‌درمیان با رعایتِ سقفِ هر سیم).
+                val useSim2: Boolean
+                val subId: Int
+                if (useDualSim) {
+                    val sim1Full = sentSim1 >= simLimit
+                    val sim2Full = sentSim2 >= simLimit
+                    if (sim1Full && sim2Full) break // سقفِ هر دو سیم پر شد
+                    useSim2 = when {
+                        sim1Full -> true          // سیم ۱ پر است → همه به سیم ۲
+                        sim2Full -> false         // سیم ۲ پر است → همه به سیم ۱
+                        else -> index % 2 == 1    // یکی‌درمیان: زوج → سیم ۱، فرد → سیم ۲
+                    }
+                    subId = if (useSim2) sim2SubId else sim1SubId
+                } else {
+                    useSim2 = false
+                    subId = -1
+                }
+
+                val template = if (useSim2) messageForSim2 else messageForCycle
+                val text = buildMessage(settings, customer, template)
+                val ok = smsSender.send(customer.phoneNumber, text, subId)
                 if (ok) {
                     dao.markSent(customer.phoneNumber, System.currentTimeMillis())
                     sent++
+                    if (useDualSim) {
+                        if (useSim2) sentSim2++ else sentSim1++
+                    }
                 } else {
                     failed++
                 }
                 setForegroundSafe(index + 1, due.size)
 
                 if (index < due.size - 1) {
+                    // در حالتِ دو سیم فاصله نصف می‌شود: چون دو سیم بارِ ارسال را تقسیم می‌کنند،
+                    // فاصلهٔ هر سیم با پیامِ بعدیِ خودش ≈ مقدارِ تنظیم‌شده می‌ماند، ولی سرعتِ کل دوبرابر.
+                    val loMin = if (useDualSim) (minDelay / 2).coerceAtLeast(1) else minDelay
+                    val loMax = if (useDualSim) (maxDelay / 2) else maxDelay
                     // فاصلهٔ تصادفی بینِ حداقل و حداکثر (اگر حداکثر بزرگ‌تر باشد)؛ وگرنه ثابت.
-                    val seconds = if (maxDelay > minDelay) (minDelay..maxDelay).random() else minDelay
+                    val seconds = if (loMax > loMin) (loMin..loMax).random() else loMin
                     delay(seconds * 1000L)
                 }
             }
@@ -151,6 +190,20 @@ class SmsWorker(
             if (!manual && settings.enabled && !isStopped) {
                 Scheduler.scheduleNext(context, settings.startHour)
             }
+        }
+    }
+
+    /**
+     * انتخابِ متنِ این دوره از یک رشتهٔ خام (که ممکن است چند متنِ جداشده با «---» داشته باشد):
+     *  - اگر «ترتیبی» روشن باشد و چند متن باشد، متنِ متناظرِ شمارهٔ دوره انتخاب می‌شود.
+     *  - در غیرِ این‌صورت، اولین متن (پیش‌فرض) برمی‌گردد.
+     */
+    private fun pickMessage(raw: String, settings: AppSettings, cycleMessageIndex: Int): String {
+        val variants = MessageTemplates.variants(raw)
+        return if (settings.sequentialMessages && variants.size > 1) {
+            variants[cycleMessageIndex % variants.size]
+        } else {
+            variants.firstOrNull() ?: raw.trim()
         }
     }
 
